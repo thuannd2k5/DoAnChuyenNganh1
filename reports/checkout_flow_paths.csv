@@ -1,0 +1,3 @@
+path_id,actions
+1,"login_success,add_item,open_cart,checkout,payment_success"
+2,"login_success,add_item,open_cart,checkout,payment_fail"

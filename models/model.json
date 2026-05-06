@@ -1,0 +1,52 @@
+{
+    "states": [
+        "q0",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "q5"
+    ],
+    "start_state": "q0",
+    "final_states": [
+        "q4",
+        "q5"
+    ],
+    "transitions": [
+        {
+            "from": "q0",
+            "action": "a",
+            "to": "q0"
+        },
+        {
+            "from": "q0",
+            "action": "b",
+            "to": "q0"
+        },
+        {
+            "from": "q0",
+            "action": "c",
+            "to": "q1"
+        },
+        {
+            "from": "q1",
+            "action": "d",
+            "to": "q2"
+        },
+        {
+            "from": "q1",
+            "action": "g",
+            "to": "q5"
+        },
+        {
+            "from": "q2",
+            "action": "e",
+            "to": "q3"
+        },
+        {
+            "from": "q3",
+            "action": "f",
+            "to": "q4"
+        }
+    ]
+}

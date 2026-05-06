@@ -1,0 +1,58 @@
+{
+    "model_name": "Checkout Flow",
+    "alphabet": [
+        "login_success",
+        "add_item",
+        "open_cart",
+        "checkout",
+        "payment_success",
+        "payment_fail"
+    ],
+    "states": [
+        "LoginPage",
+        "ProductPage",
+        "ItemAdded",
+        "CartOpened",
+        "CheckoutPage",
+        "PaymentSuccess",
+        "PaymentFailed"
+    ],
+    "start_state": "LoginPage",
+    "final_states": [
+        "PaymentSuccess",
+        "PaymentFailed"
+    ],
+    "max_depth": 12,
+    "transitions": [
+        {
+            "from": "LoginPage",
+            "action": "login_success",
+            "to": "ProductPage"
+        },
+        {
+            "from": "ProductPage",
+            "action": "add_item",
+            "to": "ItemAdded"
+        },
+        {
+            "from": "ItemAdded",
+            "action": "open_cart",
+            "to": "CartOpened"
+        },
+        {
+            "from": "CartOpened",
+            "action": "checkout",
+            "to": "CheckoutPage"
+        },
+        {
+            "from": "CheckoutPage",
+            "action": "payment_success",
+            "to": "PaymentSuccess"
+        },
+        {
+            "from": "CheckoutPage",
+            "action": "payment_fail",
+            "to": "PaymentFailed"
+        }
+    ]
+}

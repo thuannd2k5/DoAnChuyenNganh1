@@ -1,0 +1,37 @@
+{
+    "model_name": "Logout Flow",
+    "alphabet": [
+        "login_success",
+        "logout_success",
+        "logout_fail"
+    ],
+    "states": [
+        "LoggedOut",
+        "LoggedIn",
+        "LogoutSuccess",
+        "LogoutFailed"
+    ],
+    "start_state": "LoggedOut",
+    "final_states": [
+        "LogoutSuccess",
+        "LogoutFailed"
+    ],
+    "max_depth": 8,
+    "transitions": [
+        {
+            "from": "LoggedOut",
+            "action": "login_success",
+            "to": "LoggedIn"
+        },
+        {
+            "from": "LoggedIn",
+            "action": "logout_success",
+            "to": "LogoutSuccess"
+        },
+        {
+            "from": "LoggedIn",
+            "action": "logout_fail",
+            "to": "LogoutFailed"
+        }
+    ]
+}
