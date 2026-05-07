@@ -25,7 +25,7 @@ def run_framework(
     # 2. Generate paths
     csv_path = generate_paths(
         model_path,
-        output_dir=reports_dir,
+        output_dir=os.path.join(reports_dir, "csv"),
         validate=False
     )
 
