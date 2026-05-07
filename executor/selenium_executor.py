@@ -12,14 +12,21 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 class SeleniumExecutor:
+    """
+    SeleniumExecutor chịu trách nhiệm:
+    - Đọc paths.csv trong thư mục reports/
+    - Chạy từng test path (list action)
+    - Thực thi action dựa trên mapping.json
+    - Screenshot khi lỗi
+    """
 
     def __init__(self, mapping: dict, base_url: str):
         self.mapping = mapping
         self.base_url = base_url
 
         # CSV luôn nằm cố định trong reports/
-        self.csv_path = "find_latest_csv()"
-        
+        self.csv_path = "reports/logout_flow_paths.csv"
+
         # folder screenshot cố định
         self.screenshot_folder = "reports/screenshots"
         os.makedirs(self.screenshot_folder, exist_ok=True)
@@ -111,7 +118,10 @@ class SeleniumExecutor:
 
         elif action_type == "wait_element":
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-
+        elif action_type == "sequence":
+            steps = action.get("steps", [])
+            for step in steps:
+                self.execute_action(driver, step)
         else:
             raise Exception(f"Action type không hợp lệ: {action_type}")
 

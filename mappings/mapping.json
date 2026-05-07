@@ -1,4 +1,30 @@
 {
+    
+    "a": { "type": "input", "selector": "#user-name", "value": "standard_user" },
+    "b": { "type": "input", "selector": "#password", "value": "secret_sauce" },
+    "c": { "type": "click", "selector": "#login-button" },
+    "d": { "type": "wait_url", "value": "inventory" },
+    
+    "e": { "type": "click", "selector": "#react-burger-menu-btn" },
+    "f": { "type": "click", "selector": "#logout_sidebar_link" },
+    "g": { "type": "wait_url", "value": "saucedemo.com" },
+    
+    "h": { "type": "wait_url", "value": "inventory" },
+
+    "login_success": {
+        "type": "sequence",
+        "steps": ["a", "b", "c", "d"]
+      },
+    "logout_success": {
+        "type": "sequence",
+        "steps": ["e", "f", "g"]
+      },
+
+    "logout_fail": {
+        "type": "sequence",
+        "steps": ["e", "h"]
+      },
+      
     "open_login_page": {
       "type": "open_url",
       "path": "/"
