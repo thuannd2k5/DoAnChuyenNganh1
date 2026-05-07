@@ -1,0 +1,37 @@
+[
+    {
+      "path_id": 1,
+      "steps": [
+        "open_login_page",
+        "input_username",
+        "input_password",
+        "click_login",
+        "verify_dashboard"
+      ]
+    },
+    {
+      "path_id": 2,
+      "steps": [
+        "open_login_page",
+        "input_username",
+        "input_password",
+        "click_login",
+        "verify_dashboard",
+        "click_add_cart",
+        "verify_cart"
+      ]
+    },
+    {
+      "path_id": 3,
+      "steps": [
+        "open_login_page",
+        "input_username",
+        "input_password",
+        "click_login",
+        "verify_dashboard",
+        "click_menu",
+        "click_logout",
+        "verify_login_page"
+      ]
+    }
+  ]
