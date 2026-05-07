@@ -4,7 +4,7 @@ import networkx as nx
 
 def build_graph(model_path):
 
-    with open(model_path, "r") as file:
+    with open(model_path, "r", encoding="utf-8") as file:
         data = json.load(file)
 
     G = nx.DiGraph()

@@ -1,52 +1,50 @@
 {
-  "open_login_page": {
-    "type": "open_url",
-    "path": "/"
+  "login_success": {
+    "type": "sequence",
+    "steps": [
+      "input_username",
+      "input_password",
+      "click_login",
+      "verify_login_success"
+    ]
+  },
+  "add_item": {
+    "type": "click",
+    "selector": "#add-to-cart-sauce-labs-backpack",
+    "selector_type": "css"
+  },
+  "add_failed": {
+    "type": "assert_url_contains",
+    "expected": "error"
+  },
+  "open_cart": {
+    "type": "click",
+    "selector": ".shopping_cart_link",
+    "selector_type": "css"
+  },
+  "verify_cart": {
+    "type": "assert_url_contains",
+    "expected": "cart"
   },
   "input_username": {
     "type": "input",
-    "selector_type": "id",
-    "selector": "user-name",
+    "selector": "#user-name",
+    "selector_type": "css",
     "value": "standard_user"
   },
   "input_password": {
     "type": "input",
-    "selector_type": "id",
-    "selector": "password",
+    "selector": "#password",
+    "selector_type": "css",
     "value": "secret_sauce"
   },
   "click_login": {
     "type": "click",
-    "selector_type": "id",
-    "selector": "login-button"
+    "selector": "#login-button",
+    "selector_type": "css"
   },
-  "verify_dashboard": {
+  "verify_login_success": {
     "type": "assert_url_contains",
     "expected": "inventory"
-  },
-  "click_add_cart": {
-    "type": "click",
-    "selector_type": "id",
-    "selector": "add-to-cart-sauce-labs-backpack"
-  },
-  "verify_cart": {
-    "type": "assert_text",
-    "selector_type": "css",
-    "selector": ".shopping_cart_badge",
-    "expected": "1"
-  },
-  "click_menu": {
-    "type": "click",
-    "selector_type": "id",
-    "selector": "react-burger-menu-btn"
-  },
-  "click_logout": {
-    "type": "click",
-    "selector_type": "id",
-    "selector": "logout_sidebar_link"
-  },
-  "verify_login_page": {
-    "type": "assert_url_contains",
-    "expected": "saucedemo.com"
   }
 }

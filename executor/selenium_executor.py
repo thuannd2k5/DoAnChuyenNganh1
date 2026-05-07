@@ -1,6 +1,8 @@
 import os
 import csv
+import json
 from datetime import datetime
+from urllib.parse import urljoin
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -10,185 +12,334 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+from executor.assertions import (
+    assert_element_visible,
+    assert_text,
+    assert_url_contains
+)
+
 
 class SeleniumExecutor:
-    """
-    SeleniumExecutor chịu trách nhiệm:
-    - Đọc paths.csv trong thư mục reports/
-    - Chạy từng test path (list action)
-    - Thực thi action dựa trên mapping.json
-    - Screenshot khi lỗi
-    """
 
-    def __init__(self, mapping: dict, base_url: str):
+    def __init__(
+        self,
+        mapping,
+        base_url,
+        csv_path,
+        reports_dir="reports"
+    ):
+
         self.mapping = mapping
         self.base_url = base_url
+        self.csv_path = csv_path
+        self.reports_dir = reports_dir
 
-        # CSV luôn nằm cố định trong reports/
-        self.csv_path = "reports/logout_flow_paths.csv"
+        self.screenshot_folder = os.path.join(
+            reports_dir,
+            "screenshots"
+        )
+        self.report_path = os.path.join(
+            reports_dir,
+            "execution_summary.json"
+        )
 
-        # folder screenshot cố định
-        self.screenshot_folder = "reports/screenshots"
-        os.makedirs(self.screenshot_folder, exist_ok=True)
+        os.makedirs(
+            self.screenshot_folder,
+            exist_ok=True
+        )
+        os.makedirs(reports_dir, exist_ok=True)
 
-    # ==============================
-    # 1. Start Chrome Driver
-    # ==============================
     def start_driver(self):
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service)
+
+        service = Service(
+            ChromeDriverManager().install()
+        )
+
+        driver = webdriver.Chrome(
+            service=service
+        )
+
         driver.maximize_window()
+
         return driver
 
-    # ==============================
-    # 2. Screenshot
-    # ==============================
-    def take_screenshot(self, driver, path_id="unknown", action="error"):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"path_{path_id}_{action}_{timestamp}.png"
-        filepath = os.path.join(self.screenshot_folder, filename)
-
-        driver.save_screenshot(filepath)
-        return filepath
-
-    # ==============================
-    # 3. Read CSV Paths
-    # ==============================
     def load_paths_from_csv(self):
-        """
-        Đọc reports/paths.csv
-        Format CSV:
-        path_id,actions
-        1,"a,b,c"
-        2,"a,c"
-        """
-
-        if not os.path.exists(self.csv_path):
-            raise FileNotFoundError(f"Không tìm thấy file CSV tại: {self.csv_path}")
 
         paths = []
 
-        with open(self.csv_path, "r", encoding="utf-8") as f:
+        with open(
+            self.csv_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
             reader = csv.DictReader(f)
 
             for row in reader:
-                path_id = row["path_id"]
-                actions_str = row["actions"].replace('"', '')
-                actions = actions_str.split(",")
+
+                actions = (
+                    row["actions"]
+                    .replace('"', '')
+                    .split(",")
+                )
+                actions = [
+                    action.strip()
+                    for action in actions
+                    if action.strip()
+                ]
 
                 paths.append({
-                    "path_id": path_id,
+                    "path_id": row["path_id"],
                     "actions": actions
                 })
 
         return paths
 
-    # ==============================
-    # 4. Execute Single Action
-    # ==============================
-    def execute_action(self, driver, action_code: str):
-        """
-        Input: action_code ví dụ "a"
-        Output: chạy đúng lệnh Selenium tương ứng trong mapping.json
-        """
+    def take_screenshot(
+        self,
+        driver,
+        path_id,
+        action
+    ):
 
-        if action_code not in self.mapping:
-            raise Exception(f"Không tìm thấy action '{action_code}' trong mapping.json")
+        timestamp = datetime.now().strftime(
+            "%Y%m%d_%H%M%S"
+        )
 
-        action = self.mapping[action_code]
-        action_type = action.get("type")
+        filename = (
+            f"path_{path_id}_{action}_{timestamp}.png"
+        )
 
-        # default selector type: CSS
-        selector = action.get("selector")
-        value = action.get("value")
+        filepath = os.path.join(
+            self.screenshot_folder,
+            filename
+        )
 
+        driver.save_screenshot(filepath)
+
+        return filepath
+
+    def get_by(self, selector_type):
+
+        selector_map = {
+            "css": By.CSS_SELECTOR,
+            "id": By.ID,
+            "xpath": By.XPATH
+        }
+
+        if selector_type not in selector_map:
+            raise ValueError(
+                f"Unsupported selector_type: {selector_type}"
+            )
+
+        return selector_map[selector_type]
+
+    def find_element(self, driver, action, condition):
+
+        selector = action["selector"]
+        selector_type = action.get("selector_type", "css")
+        by = self.get_by(selector_type)
         wait = WebDriverWait(driver, 10)
 
-        if action_type == "click":
-            element = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
+        return wait.until(condition((by, selector)))
+
+    def execute_action(
+        self,
+        driver,
+        action_name
+    ):
+
+        if action_name not in self.mapping:
+            raise Exception(
+                f"Action not found in mapping: {action_name}"
+            )
+
+        action = self.mapping[action_name]
+
+        action_type = action["type"]
+
+        if action_type == "sequence":
+
+            for step in action["steps"]:
+                self.execute_action(driver, step)
+
+        elif action_type == "open_url":
+
+            path = action.get("path", "/")
+            driver.get(urljoin(self.base_url, path))
+
+        elif action_type == "click":
+
+            element = self.find_element(
+                driver,
+                action,
+                EC.element_to_be_clickable
+            )
+
             element.click()
 
         elif action_type == "input":
-            element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+
+            value = action["value"]
+
+            element = self.find_element(
+                driver,
+                action,
+                EC.presence_of_element_located
+            )
+
             element.clear()
+
             element.send_keys(value)
 
+        elif action_type == "wait":
+
+            element = self.find_element(
+                driver,
+                action,
+                EC.visibility_of_element_located
+            )
+
+            if not assert_element_visible(element):
+                raise Exception("Element is not visible")
+
         elif action_type == "wait_url":
-            wait.until(EC.url_contains(value))
 
-        elif action_type == "wait_element":
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-        elif action_type == "sequence":
-            steps = action.get("steps", [])
-            for step in steps:
-                self.execute_action(driver, step)
+            expected = action["value"]
+            wait = WebDriverWait(driver, 10)
+            wait.until(EC.url_contains(expected))
+
+        elif action_type == "assert_url_contains":
+
+            expected = action["expected"]
+
+            ok = assert_url_contains(
+                driver,
+                expected
+            )
+
+            if not ok:
+                raise Exception(
+                    f"URL assertion fail: {expected}"
+                )
+
+        elif action_type == "assert_text":
+
+            expected = action["expected"]
+
+            element = self.find_element(
+                driver,
+                action,
+                EC.presence_of_element_located
+            )
+
+            if not assert_text(element, expected):
+                raise Exception(
+                    f"Text assertion fail: expected '{expected}', actual '{element.text.strip()}'"
+                )
+
         else:
-            raise Exception(f"Action type không hợp lệ: {action_type}")
 
-    # ==============================
-    # 5. Run One Path
-    # ==============================
-    def run_path(self, path_id: str, actions: list):
-        """
-        Input: actions = ["a","b","c"]
-        Output: True nếu chạy thành công, False nếu fail
-        """
+            raise ValueError(
+                f"Unsupported action type: {action_type}"
+            )
+
+    def run_path(
+        self,
+        path_id,
+        actions
+    ):
 
         driver = self.start_driver()
+        action = "start"
+
         driver.get(self.base_url)
 
         try:
-            for act in actions:
-                self.execute_action(driver, act)
+
+            for action in actions:
+                self.execute_action(
+                    driver,
+                    action
+                )
 
             driver.quit()
-            return True
+
+            return {
+                "path_id": path_id,
+                "status": "PASS",
+                "screenshot": None,
+                "error": None
+            }
 
         except Exception as e:
-            screenshot_path = self.take_screenshot(driver, path_id, act)
+
+            screenshot = self.take_screenshot(
+                driver,
+                path_id,
+                action
+            )
+
+            print(f"[FAIL] {e}")
+            print(f"Screenshot: {screenshot}")
+
             driver.quit()
 
-            print(f"[FAIL] Path {path_id} lỗi tại action '{act}'")
-            print(f"Screenshot: {screenshot_path}")
-            print(f"Error: {e}")
+            return {
+                "path_id": path_id,
+                "status": "FAIL",
+                "screenshot": screenshot,
+                "error": str(e)
+            }
 
-            return False
-
-    # ==============================
-    # 6. Run All Paths From CSV
-    # ==============================
     def run_all_from_csv(self):
-        """
-        Đọc CSV và chạy toàn bộ path
-        """
 
         paths = self.load_paths_from_csv()
 
-        results = []
         total = len(paths)
-        passed = 0
+
+        results = []
 
         for p in paths:
+
             path_id = p["path_id"]
+
             actions = p["actions"]
 
-            print(f"\n[RUNNING] Path {path_id}: {actions}")
+            print(f"\nRUNNING PATH {path_id}")
 
-            ok = self.run_path(path_id, actions)
+            result = self.run_path(
+                path_id,
+                actions
+            )
+            results.append(result)
 
-            if ok:
-                passed += 1
-                results.append((path_id, "PASS"))
-                print(f"[PASS] Path {path_id}")
+            if result["status"] == "PASS":
+                print(f"PASS PATH {path_id}")
+
             else:
-                results.append((path_id, "FAIL"))
+                print(f"FAIL PATH {path_id}")
 
+        passed = len([
+            result for result in results
+            if result["status"] == "PASS"
+        ])
         failed = total - passed
+        summary = {
+            "total": total,
+            "passed": passed,
+            "failed": failed,
+            "results": results
+        }
 
-        print("\n==================== SUMMARY ====================")
+        print("\n===== SUMMARY =====")
         print(f"TOTAL : {total}")
         print(f"PASS  : {passed}")
         print(f"FAIL  : {failed}")
-        print("=================================================")
 
-        return results
+        with open(self.report_path, "w", encoding="utf-8") as file:
+            json.dump(summary, file, indent=2, ensure_ascii=False)
+
+        print(f"Summary report: {self.report_path}")
+
+        return summary

@@ -1,3 +1,6 @@
+import json
+
+
 REQUIRED_KEYS = [
     "model_name",
     "alphabet",
@@ -7,6 +10,12 @@ REQUIRED_KEYS = [
     "max_depth",
     "transitions"
 ]
+
+
+def load_model(model_path):
+
+    with open(model_path, "r", encoding="utf-8") as file:
+        return json.load(file)
 
 
 def validate_json_schema(data):
@@ -61,7 +70,8 @@ def validate_json_schema(data):
 
     print("JSON schema valid!")
 
-def validate_dfa(data):
+
+def validate_dfa_rules(data):
 
     print("Validating DFA rules...")
 
@@ -83,3 +93,13 @@ def validate_dfa(data):
         transition_map[key] = transition["to"]
 
     print("DFA validation passed!")
+
+
+def validate_dfa(model_path):
+
+    data = load_model(model_path)
+
+    validate_json_schema(data)
+    validate_dfa_rules(data)
+
+    return data

@@ -1,2 +1,3 @@
-MODEL_PATH = "models/checkout.json"
-EXPORT_CSV = "paths.csv"
+REPORTS_DIR = "reports"
+GRAPHS_DIR = "reports/graphs"
+SCREENSHOTS_DIR = "reports/screenshots"

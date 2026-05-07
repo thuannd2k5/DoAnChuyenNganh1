@@ -1,93 +1,63 @@
 import csv
+import os
 
-from graph_builder import build_graph
-from validator import (
-    validate_json_schema,
-    validate_dfa
-)
-
-from config import (
-    MODEL_PATH,
-    EXPORT_CSV
-)
-
-# Build graph
-G, data = build_graph(MODEL_PATH)
-
-# Validate
-validate_json_schema(data)
-validate_dfa(data)
-
-start_state = data["start_state"]
-final_states = data["final_states"]
-MAX_DEPTH = data["max_depth"]
-
-all_paths = []
+from engine.graph_builder import build_graph
+from engine.validator import validate_dfa
 
 
-def dfs(current_state, path, visited):
+def _safe_name(value):
 
-    # Prevent infinite loop
-    if len(path) >= MAX_DEPTH:
-        return
-
-    # Final state
-    if current_state in final_states:
-
-        all_paths.append(path.copy())
-        return
-
-    visited.add(current_state)
-
-    for next_state in G.successors(current_state):
-
-        if next_state not in visited or next_state in final_states:
-
-            action = G[current_state][next_state]["action"]
-
-            path.append(action)
-
-            dfs(
-                next_state,
-                path,
-                visited.copy()
-            )
-
-            path.pop()
+    return value.lower().replace(" ", "_")
 
 
-# Start DFS
-dfs(start_state, [], set())
+def generate_paths(model_path, output_dir="reports", validate=True):
 
-print("\nGenerated Test Paths:\n")
+    os.makedirs(output_dir, exist_ok=True)
 
-for path in all_paths:
-    print(path)
+    if validate:
+        data = validate_dfa(model_path)
+        graph, _ = build_graph(model_path)
+    else:
+        graph, data = build_graph(model_path)
 
-# Export CSV
-model_name = (
-    data["model_name"]
-    .lower()
-    .replace(" ", "_")
-)
+    start_state = data["start_state"]
+    final_states = set(data["final_states"])
+    max_depth = data["max_depth"]
+    all_paths = []
 
-csv_path = f"reports/{model_name}_paths.csv"
+    def dfs(current_state, path, visited):
 
-with open(csv_path, "w", newline="") as file:
+        if len(path) >= max_depth:
+            return
 
-    writer = csv.writer(file)
+        if current_state in final_states:
+            all_paths.append(path.copy())
+            return
 
-    writer.writerow([
-        "path_id",
-        "actions"
-    ])
+        visited.add(current_state)
 
-    for i, path in enumerate(all_paths):
+        for next_state in graph.successors(current_state):
 
-        writer.writerow([
-            i + 1,
-            ",".join(path)
-        ])
+            if next_state not in visited or next_state in final_states:
+                action = graph[current_state][next_state]["action"]
+                path.append(action)
+                dfs(next_state, path, visited.copy())
+                path.pop()
 
-print("\nCSV exported successfully!")
-print(f"CSV exported to: {csv_path}")
+    dfs(start_state, [], set())
+
+    model_name = _safe_name(data["model_name"])
+    csv_path = os.path.join(output_dir, f"{model_name}_paths.csv")
+
+    with open(csv_path, "w", newline="", encoding="utf-8") as file:
+
+        writer = csv.writer(file)
+        writer.writerow(["path_id", "actions"])
+
+        for index, path in enumerate(all_paths, start=1):
+            writer.writerow([index, ",".join(path)])
+
+    print(f"Generated {len(all_paths)} test paths")
+    print(f"CSV exported to: {csv_path}")
+
+    return csv_path

@@ -1,0 +1,51 @@
+{
+  "model_name": "Add To Cart Flow",
+  "alphabet": [
+    "login_success",
+    "add_item",
+    "open_cart",
+    "verify_cart",
+    "add_failed"
+  ],
+  "states": [
+    "LoginPage",
+    "ProductPage",
+    "ItemAdded",
+    "CartOpened",
+    "CartVerified",
+    "AddFailed"
+  ],
+  "start_state": "LoginPage",
+  "final_states": [
+    "CartVerified",
+    "AddFailed"
+  ],
+  "max_depth": 10,
+  "transitions": [
+    {
+      "from": "LoginPage",
+      "action": "login_success",
+      "to": "ProductPage"
+    },
+    {
+      "from": "ProductPage",
+      "action": "add_item",
+      "to": "ItemAdded"
+    },
+    {
+      "from": "ProductPage",
+      "action": "add_failed",
+      "to": "AddFailed"
+    },
+    {
+      "from": "ItemAdded",
+      "action": "open_cart",
+      "to": "CartOpened"
+    },
+    {
+      "from": "CartOpened",
+      "action": "verify_cart",
+      "to": "CartVerified"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "total": 2,
+  "passed": 1,
+  "failed": 1,
+  "results": [
+    {
+      "path_id": "1",
+      "status": "PASS",
+      "screenshot": null,
+      "error": null
+    },
+    {
+      "path_id": "2",
+      "status": "FAIL",
+      "screenshot": "D:\\DACN\\reports\\screenshots\\path_2_add_failed_20260507_181131.png",
+      "error": "URL assertion fail: error"
+    }
+  ]
+}

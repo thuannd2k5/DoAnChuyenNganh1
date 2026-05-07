@@ -1,84 +1,78 @@
+import os
+
 import matplotlib.pyplot as plt
 import networkx as nx
 
-from graph_builder import build_graph
+from engine.graph_builder import build_graph
 
-from config import (
-    MODEL_PATH
-)
 
-# Build graph
-G, data = build_graph(MODEL_PATH)
+def _safe_name(value):
 
-# Node colors
-node_colors = []
+    return value.lower().replace(" ", "_")
 
-for node in G.nodes():
 
-    if node == data["start_state"]:
-        node_colors.append("lightgreen")
+def generate_graph(model_path, output_dir="reports/graphs"):
 
-    elif node in data["final_states"]:
-        node_colors.append("salmon")
+    os.makedirs(output_dir, exist_ok=True)
 
-    else:
-        node_colors.append("lightblue")
+    graph, data = build_graph(model_path)
 
-# Better layout
-pos = nx.spring_layout(
-    G,
-    k=2,
-    seed=42
-)
+    node_colors = []
 
-# Edge labels
-edge_labels = nx.get_edge_attributes(
-    G,
-    "action"
-)
+    for node in graph.nodes():
 
-# Figure
-plt.figure(figsize=(16, 10))
+        if node == data["start_state"]:
+            node_colors.append("lightgreen")
 
-# Draw graph
-nx.draw(
-    G,
-    pos,
-    with_labels=True,
-    node_size=7000,
-    node_color=node_colors,
-    font_size=12,
-    arrowsize=20
-)
+        elif node in data["final_states"]:
+            node_colors.append("salmon")
 
-# Draw edge labels
-nx.draw_networkx_edge_labels(
-    G,
-    pos,
-    edge_labels=edge_labels,
-    font_size=10
-)
+        else:
+            node_colors.append("lightblue")
 
-# Title
-plt.title(
-    data["model_name"],
-    fontsize=18
-)
+    pos = nx.spring_layout(
+        graph,
+        k=2,
+        seed=42
+    )
 
-plt.tight_layout()
+    edge_labels = nx.get_edge_attributes(
+        graph,
+        "action"
+    )
 
-# Save image
-graph_name = (
-    data["model_name"]
-    .lower()
-    .replace(" ", "_")
-)
+    plt.figure(figsize=(16, 10))
 
-output_path = f"reports/screenshots/{graph_name}.png"
+    nx.draw(
+        graph,
+        pos,
+        with_labels=True,
+        node_size=7000,
+        node_color=node_colors,
+        font_size=12,
+        arrowsize=20
+    )
 
-plt.savefig(output_path)
+    nx.draw_networkx_edge_labels(
+        graph,
+        pos,
+        edge_labels=edge_labels,
+        font_size=10
+    )
 
-print(f"Graph saved to: {output_path}")
+    plt.title(
+        data["model_name"],
+        fontsize=18
+    )
 
-# Show graph
-plt.show()
+    plt.tight_layout()
+
+    graph_name = _safe_name(data["model_name"])
+    output_path = os.path.join(output_dir, f"{graph_name}.png")
+
+    plt.savefig(output_path)
+    plt.close()
+
+    print(f"Graph saved to: {output_path}")
+
+    return output_path

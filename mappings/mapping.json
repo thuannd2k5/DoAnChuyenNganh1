@@ -1,135 +1,50 @@
 {
-    "a": {
-        "type": "input",
-        "selector": "#user-name",
-        "value": "standard_user"
-    },
-    "b": {
-        "type": "input",
-        "selector": "#password",
-        "value": "secret_sauce"
-    },
-    "c": {
-        "type": "click",
-        "selector": "#login-button"
-    },
-    "d": {
-        "type": "wait_url",
-        "value": "inventory"
-    },
-    "e": {
-        "type": "click",
-        "selector": "#react-burger-menu-btn"
-    },
-    "f": {
-        "type": "click",
-        "selector": "#logout_sidebar_link"
-    },
-    "g": {
-        "type": "wait_url",
-        "value": "saucedemo.com"
-    },
-    "h": {
-        "type": "wait_url",
-        "value": "inventory"
-    },
     "login_success": {
         "type": "sequence",
         "steps": [
-            "a",
-            "b",
-            "c",
-            "d"
+            "input_username",
+            "input_password",
+            "click_login",
+            "verify_login_success"
         ]
     },
-    "logout_success": {
-        "type": "sequence",
-        "steps": [
-            "e",
-            "f",
-            "g"
-        ]
-    },
-    "logout_fail": {
-        "type": "sequence",
-        "steps": [
-            "e",
-            "h"
-        ]
-    },
-    "open_login_page": {
-        "type": "open_url",
-        "path": "/"
-    },
-    "input_username": {
-        "type": "input",
-        "selector_type": "id",
-        "selector": "user-name",
-        "value": "standard_user"
-    },
-    "input_password": {
-        "type": "input",
-        "selector_type": "id",
-        "selector": "password",
-        "value": "secret_sauce"
-    },
-    "click_login": {
+    "add_item": {
         "type": "click",
-        "selector_type": "id",
-        "selector": "login-button"
+        "selector": "#add-to-cart-sauce-labs-backpack",
+        "selector_type": "css"
     },
-    "verify_dashboard": {
+    "add_failed": {
         "type": "assert_url_contains",
-        "expected": "inventory"
+        "expected": "error"
     },
-    "open_login_page": {
-        "type": "open_url",
-        "path": "/"
-    },
-    "input_username": {
-        "type": "input",
-        "selector_type": "id",
-        "selector": "user-name",
-        "value": "standard_user"
-    },
-    "input_password": {
-        "type": "input",
-        "selector_type": "id",
-        "selector": "password",
-        "value": "secret_sauce"
-    },
-    "click_login": {
+    "open_cart": {
         "type": "click",
-        "selector_type": "id",
-        "selector": "login-button"
-    },
-    "verify_dashboard": {
-        "type": "assert_url_contains",
-        "expected": "inventory"
-    },
-    "click_add_cart": {
-        "type": "click",
-        "selector_type": "id",
-        "selector": "add-to-cart-sauce-labs-backpack"
+        "selector": ".shopping_cart_link",
+        "selector_type": "css"
     },
     "verify_cart": {
-        "type": "assert_text",
-        "selector_type": "css",
-        "selector": ".shopping_cart_badge",
-        "expected": "1"
-    },
-    "click_menu": {
-        "type": "click",
-        "selector_type": "id",
-        "selector": "react-burger-menu-btn"
-    },
-    "click_logout": {
-        "type": "click",
-        "selector_type": "id",
-        "selector": "logout_sidebar_link"
-    },
-    "verify_login_page": {
         "type": "assert_url_contains",
-        "expected": "saucedemo.com"
+        "expected": "cart"
+    },
+    "input_username": {
+        "type": "input",
+        "selector": "#user-name",
+        "selector_type": "css",
+        "value": "standard_user"
+    },
+    "input_password": {
+        "type": "input",
+        "selector": "#password",
+        "selector_type": "css",
+        "value": "secret_sauce"
+    },
+    "click_login": {
+        "type": "click",
+        "selector": "#login-button",
+        "selector_type": "css"
+    },
+    "verify_login_success": {
+        "type": "assert_url_contains",
+        "expected": "inventory"
     }
 }
