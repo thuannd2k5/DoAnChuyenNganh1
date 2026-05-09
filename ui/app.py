@@ -45,6 +45,37 @@ def read_csv_if_exists(csv_path):
     return pd.read_csv(path)
 
 
+def build_results_dataframe(results):
+
+    rows = []
+
+    for item in results:
+        rows.append({
+            "path_id": item.get("path_id"),
+            "status": item.get("status"),
+            "duration_seconds": item.get("duration_seconds"),
+            "failed_action": item.get("failed_action"),
+            "failed_state": item.get("failed_state"),
+            "error": item.get("error"),
+            "screenshot": item.get("screenshot")
+        })
+
+    return pd.DataFrame(rows)
+
+
+def build_chart_dataframe(rows, label_key, value_key):
+
+    if not rows:
+        return pd.DataFrame()
+
+    return pd.DataFrame(rows).set_index(label_key)[value_key]
+
+
+def image_exists(image_path):
+
+    return bool(image_path) and Path(image_path).exists()
+
+
 st.set_page_config(
     page_title="DFA Web Testing Tool",
     layout="wide"
@@ -142,16 +173,27 @@ else:
     total = summary.get("total", 0)
     passed = summary.get("passed", 0)
     failed = summary.get("failed", 0)
+    total_duration = summary.get("total_duration", 0)
+    average_duration = summary.get("average_duration", 0)
+    slowest_path = summary.get("slowest_path") or {}
+    most_failed_action = summary.get("most_failed_action") or {}
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
     col1.metric("Total Paths", total)
     col2.metric("Passed", passed)
     col3.metric("Failed", failed)
-    col4.metric("Model", result["model_name"])
+    col4.metric("Total Time", f"{total_duration}s")
+    col5.metric("Avg Time", f"{average_duration}s")
+    col6.metric(
+        "Slowest Path",
+        slowest_path.get("path_id", "-")
+    )
 
-    tab_summary, tab_paths, tab_graph, tab_mapping, tab_files = st.tabs(
+    tab_summary, tab_failures, tab_analytics, tab_paths, tab_graph, tab_mapping, tab_files = st.tabs(
         [
             "Summary",
+            "Failures",
+            "Analytics",
             "Generated Paths",
             "Graph",
             "Mapping",
@@ -162,22 +204,145 @@ else:
     with tab_summary:
         st.subheader("Execution Summary")
 
-        rows = []
-
-        for item in summary.get("results", []):
-            rows.append({
-                "path_id": item.get("path_id"),
-                "status": item.get("status"),
-                "error": item.get("error"),
-                "screenshot": item.get("screenshot")
-            })
+        results_df = build_results_dataframe(
+            summary.get("results", [])
+        )
 
         st.dataframe(
-            pd.DataFrame(rows),
+            results_df,
             use_container_width=True
         )
 
+        timing_df = results_df[
+            [
+                "path_id",
+                "duration_seconds",
+                "status"
+            ]
+        ] if not results_df.empty else pd.DataFrame()
+
+        if not timing_df.empty:
+            st.subheader("Execution Timing")
+            st.bar_chart(
+                timing_df.set_index("path_id")["duration_seconds"]
+            )
+
         st.json(summary)
+
+    with tab_failures:
+        st.subheader("Failed Test Cases")
+
+        failed_results = [
+            item for item in summary.get("results", [])
+            if item.get("status") == "FAIL"
+        ]
+
+        if not failed_results:
+            st.success("No failed test cases.")
+
+        for item in failed_results:
+            title = (
+                f"Path {item.get('path_id')} | "
+                f"Action: {item.get('failed_action')} | "
+                f"{item.get('duration_seconds')}s"
+            )
+
+            with st.expander(title, expanded=True):
+                st.write("Error:")
+                st.code(item.get("error") or "")
+
+                st.write("Actions:")
+                st.code(" -> ".join(item.get("actions", [])))
+
+                st.write("State Trace:")
+                st.code(" -> ".join(item.get("state_trace", [])))
+
+                screenshot_path = item.get("screenshot")
+
+                if image_exists(screenshot_path):
+                    st.image(
+                        screenshot_path,
+                        caption=screenshot_path,
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("No screenshot available.")
+
+    with tab_analytics:
+        st.subheader("Fail Analytics")
+
+        a1, a2, a3 = st.columns(3)
+        a1.metric(
+            "Most Failed Action",
+            most_failed_action.get("action", "-"),
+            most_failed_action.get("count", 0)
+        )
+        a2.metric(
+            "Most Failed Path",
+            (summary.get("most_failed_path") or {}).get("path_id", "-"),
+            (summary.get("most_failed_path") or {}).get("count", 0)
+        )
+        a3.metric(
+            "Most Failed State",
+            (summary.get("most_failed_state") or {}).get("state", "-"),
+            (summary.get("most_failed_state") or {}).get("count", 0)
+        )
+
+        failed_actions = summary.get("failed_actions", [])
+        failed_paths = summary.get("failed_paths", [])
+        failed_states = summary.get("failed_states", [])
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.write("Failed Actions")
+            action_chart = build_chart_dataframe(
+                failed_actions,
+                "action",
+                "fail_count"
+            )
+
+            if action_chart.empty:
+                st.info("No failed actions.")
+            else:
+                st.bar_chart(action_chart)
+                st.dataframe(
+                    pd.DataFrame(failed_actions),
+                    use_container_width=True
+                )
+
+        with c2:
+            st.write("Failed Paths")
+            path_chart = build_chart_dataframe(
+                failed_paths,
+                "path_id",
+                "fail_count"
+            )
+
+            if path_chart.empty:
+                st.info("No failed paths.")
+            else:
+                st.bar_chart(path_chart)
+                st.dataframe(
+                    pd.DataFrame(failed_paths),
+                    use_container_width=True
+                )
+
+        st.write("Failed State Frequency")
+        state_chart = build_chart_dataframe(
+            failed_states,
+            "state",
+            "fail_frequency"
+        )
+
+        if state_chart.empty:
+            st.info("No failed states.")
+        else:
+            st.bar_chart(state_chart)
+            st.dataframe(
+                pd.DataFrame(failed_states),
+                use_container_width=True
+            )
 
     with tab_paths:
         st.subheader("Generated Test Paths")
