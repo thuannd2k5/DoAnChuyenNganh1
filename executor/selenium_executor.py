@@ -192,22 +192,39 @@ class SeleniumExecutor:
     def execute_action(
         self,
         driver,
-        action_name
+        action_name,
+        action_data=None
     ):
 
-        if action_name not in self.mapping:
-            raise Exception(
-                f"Action not found in mapping: {action_name}"
-            )
+        if action_data is None:
+            if action_name not in self.mapping:
+                raise Exception(
+                    f"Action not found in mapping: {action_name}"
+                )
 
-        action = self.mapping[action_name]
+            action = self.mapping[action_name]
+
+        else:
+            action = action_data
+
+        if isinstance(action, list):
+            for index, step in enumerate(action, start=1):
+                self.execute_action(
+                    driver,
+                    f"{action_name}[{index}]",
+                    step
+                )
+            return
 
         action_type = action["type"]
 
         if action_type == "sequence":
 
             for step in action["steps"]:
-                self.execute_action(driver, step)
+                if isinstance(step, dict):
+                    self.execute_action(driver, action_name, step)
+                else:
+                    self.execute_action(driver, step)
 
         elif action_type == "open_url":
 
@@ -255,7 +272,7 @@ class SeleniumExecutor:
             wait = WebDriverWait(driver, 10)
             wait.until(EC.url_contains(expected))
 
-        elif action_type == "assert_url_contains":
+        elif action_type in ("assert_url_contains", "assert_url"):
 
             expected = action["expected"]
 
@@ -283,6 +300,14 @@ class SeleniumExecutor:
                 raise Exception(
                     f"Text assertion fail: expected '{expected}', actual '{element.text.strip()}'"
                 )
+
+        elif action_type == "screenshot":
+
+            self.take_screenshot(
+                driver,
+                "manual",
+                action_name
+            )
 
         else:
 

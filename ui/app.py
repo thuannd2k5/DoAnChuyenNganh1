@@ -32,6 +32,33 @@ REPORTS_DIR = ROOT_DIR / "reports"
 TEMP_MODEL_PATH = REPORTS_DIR / "temp_model.json"
 TEMP_MAPPING_PATH = REPORTS_DIR / "temp_mapping.json"
 
+STEP_TYPES = [
+    "click",
+    "input",
+    "assert_text",
+    "assert_url",
+    "wait",
+    "screenshot"
+]
+SELECTOR_TYPES = [
+    "id",
+    "css",
+    "xpath"
+]
+STEP_TYPES_WITH_SELECTOR = {
+    "click",
+    "input",
+    "assert_text",
+    "wait"
+}
+STEP_TYPES_WITH_VALUE = {
+    "input"
+}
+STEP_TYPES_WITH_EXPECTED = {
+    "assert_text",
+    "assert_url"
+}
+
 
 def save_uploaded_json(uploaded_file, output_path):
 
@@ -106,6 +133,23 @@ def init_builder_state():
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
+
+def init_mapping_builder_state():
+
+    if "mapping_builder_steps" not in st.session_state:
+        st.session_state.mapping_builder_steps = {}
+
+
+def create_empty_mapping_step(step_type="click"):
+
+    return {
+        "type": step_type,
+        "selector_type": "id",
+        "selector": "",
+        "value": "",
+        "expected": ""
+    }
 
 
 def add_state(state_id, state_label):
@@ -221,6 +265,293 @@ def build_dfa_model():
     }
 
 
+def extract_actions_from_model(model_data):
+
+    seen = set()
+    actions = []
+
+    for transition in model_data.get("transitions", []):
+        action = str(transition.get("action", "")).strip()
+
+        if action and action not in seen:
+            seen.add(action)
+            actions.append(action)
+
+    return actions
+
+
+def sync_mapping_builder_actions(actions):
+
+    current_steps = st.session_state.mapping_builder_steps
+
+    for action in actions:
+        if action not in current_steps:
+            current_steps[action] = []
+
+    stale_actions = [
+        action for action in current_steps
+        if action not in actions
+    ]
+
+    for action in stale_actions:
+        del current_steps[action]
+
+
+def add_mapping_step(action):
+
+    st.session_state.mapping_builder_steps[action].append(
+        create_empty_mapping_step()
+    )
+
+
+def remove_mapping_step(action, index):
+
+    steps = st.session_state.mapping_builder_steps.get(action, [])
+
+    if 0 <= index < len(steps):
+        steps.pop(index)
+
+
+def move_mapping_step(action, index, direction):
+
+    steps = st.session_state.mapping_builder_steps.get(action, [])
+    target_index = index + direction
+
+    if 0 <= index < len(steps) and 0 <= target_index < len(steps):
+        steps[index], steps[target_index] = steps[target_index], steps[index]
+
+
+def clean_mapping_step(step):
+
+    step_type = step.get("type", "click")
+    cleaned = {
+        "type": step_type
+    }
+
+    if step_type in STEP_TYPES_WITH_SELECTOR:
+        cleaned["selector_type"] = step.get("selector_type", "id")
+        cleaned["selector"] = step.get("selector", "").strip()
+
+    if step_type in STEP_TYPES_WITH_VALUE:
+        cleaned["value"] = step.get("value", "")
+
+    if step_type in STEP_TYPES_WITH_EXPECTED:
+        cleaned["expected"] = step.get("expected", "").strip()
+
+    return cleaned
+
+
+def build_mapping_from_builder(actions):
+
+    mapping = {}
+
+    for action in actions:
+        steps = st.session_state.mapping_builder_steps.get(action, [])
+        mapping[action] = [
+            clean_mapping_step(step)
+            for step in steps
+        ]
+
+    return mapping
+
+
+def validate_mapping_builder(mapping, actions):
+
+    errors = []
+
+    duplicate_actions = [
+        action for action in actions
+        if actions.count(action) > 1
+    ]
+
+    if duplicate_actions:
+        errors.append(
+            "Duplicate actions: "
+            + ", ".join(sorted(set(duplicate_actions)))
+        )
+
+    for action in actions:
+        steps = mapping.get(action, [])
+
+        if not steps:
+            errors.append(f"{action}: add at least 1 Selenium step.")
+            continue
+
+        for index, step in enumerate(steps, start=1):
+            step_type = step.get("type")
+
+            if step_type not in STEP_TYPES:
+                errors.append(f"{action} step {index}: invalid step type.")
+                continue
+
+            if step_type in STEP_TYPES_WITH_SELECTOR:
+                if not step.get("selector", "").strip():
+                    errors.append(
+                        f"{action} step {index}: selector is required."
+                    )
+
+                if step.get("selector_type") not in SELECTOR_TYPES:
+                    errors.append(
+                        f"{action} step {index}: selector_type is invalid."
+                    )
+
+            if (
+                step_type in STEP_TYPES_WITH_EXPECTED
+                and not step.get("expected", "").strip()
+            ):
+                errors.append(f"{action} step {index}: expected is required.")
+
+    return errors
+
+
+def render_step_form(action, step, index):
+
+    type_col, selector_type_col, selector_col = st.columns([1.2, 1, 2])
+
+    with type_col:
+        step["type"] = st.selectbox(
+            "type",
+            options=STEP_TYPES,
+            index=STEP_TYPES.index(step.get("type", "click"))
+            if step.get("type", "click") in STEP_TYPES else 0,
+            key=f"mapping_{action}_{index}_type"
+        )
+
+    with selector_type_col:
+        selector_disabled = step["type"] not in STEP_TYPES_WITH_SELECTOR
+        step["selector_type"] = st.selectbox(
+            "selector_type",
+            options=SELECTOR_TYPES,
+            index=SELECTOR_TYPES.index(step.get("selector_type", "id"))
+            if step.get("selector_type", "id") in SELECTOR_TYPES else 0,
+            disabled=selector_disabled,
+            key=f"mapping_{action}_{index}_selector_type"
+        )
+
+    with selector_col:
+        step["selector"] = st.text_input(
+            "selector",
+            value=step.get("selector", ""),
+            disabled=step["type"] not in STEP_TYPES_WITH_SELECTOR,
+            key=f"mapping_{action}_{index}_selector"
+        )
+
+    value_col, expected_col, button_col = st.columns([2, 2, 1.4])
+
+    with value_col:
+        step["value"] = st.text_input(
+            "value",
+            value=step.get("value", ""),
+            disabled=step["type"] not in STEP_TYPES_WITH_VALUE,
+            key=f"mapping_{action}_{index}_value"
+        )
+
+    with expected_col:
+        step["expected"] = st.text_input(
+            "expected",
+            value=step.get("expected", ""),
+            disabled=step["type"] not in STEP_TYPES_WITH_EXPECTED,
+            key=f"mapping_{action}_{index}_expected"
+        )
+
+    with button_col:
+        up_col, down_col, remove_col = st.columns(3)
+
+        if up_col.button(
+            "Up",
+            key=f"mapping_{action}_{index}_up",
+            disabled=index == 0
+        ):
+            move_mapping_step(action, index, -1)
+            st.rerun()
+
+        if down_col.button(
+            "Down",
+            key=f"mapping_{action}_{index}_down",
+            disabled=index >= len(st.session_state.mapping_builder_steps[action]) - 1
+        ):
+            move_mapping_step(action, index, 1)
+            st.rerun()
+
+        if remove_col.button(
+            "Remove",
+            key=f"mapping_{action}_{index}_remove"
+        ):
+            remove_mapping_step(action, index)
+            st.rerun()
+
+
+def render_visual_mapping_builder(actions):
+
+    st.subheader("Visual Mapping Builder")
+
+    if not actions:
+        st.info("Add DFA transitions first. Actions will be extracted automatically.")
+        return {}, ["No DFA actions found."]
+
+    sync_mapping_builder_actions(actions)
+
+    st.caption(
+        "Actions are extracted from DFA transitions. Each action must contain at least one Selenium step."
+    )
+
+    for action in actions:
+        steps = st.session_state.mapping_builder_steps[action]
+        title = f"Action: {action} ({len(steps)} step{'s' if len(steps) != 1 else ''})"
+
+        with st.expander(title, expanded=True):
+            if not steps:
+                st.info("No steps yet.")
+
+            for index, step in enumerate(steps):
+                st.markdown(f"Step {index + 1}")
+                render_step_form(action, step, index)
+
+            if st.button(
+                "Add Step",
+                key=f"mapping_{action}_add_step"
+            ):
+                add_mapping_step(action)
+                st.rerun()
+
+    mapping = build_mapping_from_builder(actions)
+    errors = validate_mapping_builder(mapping, actions)
+
+    preview_col, validation_col = st.columns([1.2, 1])
+
+    with preview_col:
+        st.write("Mapping JSON preview")
+        st.json(mapping)
+
+        st.download_button(
+            "Download mapping.json",
+            data=json.dumps(mapping, indent=2, ensure_ascii=False),
+            file_name="mapping.json",
+            mime="application/json",
+            use_container_width=True,
+            disabled=bool(errors)
+        )
+
+    with validation_col:
+        st.write("Validation")
+
+        if errors:
+            for error in errors:
+                st.error(error)
+        else:
+            st.success("Mapping is valid.")
+
+        if st.button(
+            "Save Generated Mapping",
+            use_container_width=True,
+            disabled=bool(errors)
+        ):
+            save_json(mapping, TEMP_MAPPING_PATH)
+            st.success(f"Saved mapping to {TEMP_MAPPING_PATH}")
+
+    return mapping, errors
+
+
 def render_visual_graph(model_data):
 
     if agraph is None:
@@ -307,6 +638,7 @@ st.set_page_config(
 )
 
 init_builder_state()
+init_mapping_builder_state()
 
 st.title("DFA Web Testing Tool")
 st.caption("Model-Based Testing with DFA, DFS and Selenium")
@@ -319,8 +651,13 @@ website_url = st.sidebar.text_input(
 )
 
 mapping_file = st.sidebar.file_uploader(
-    "Mapping JSON",
+    "Mapping JSON fallback",
     type=["json"]
+)
+
+use_visual_mapping = st.sidebar.checkbox(
+    "Use Visual Mapping Builder",
+    value=True
 )
 
 run_button = st.sidebar.button(
@@ -442,6 +779,7 @@ with builder_right:
 
 
 generated_model = build_dfa_model()
+generated_actions = extract_actions_from_model(generated_model)
 
 preview_tab, json_tab = st.tabs(
     [
@@ -474,6 +812,11 @@ with json_tab:
     )
 
 
+generated_mapping, mapping_errors = render_visual_mapping_builder(
+    generated_actions
+)
+
+
 if run_button:
 
     builder_error = validate_builder_model(generated_model)
@@ -481,11 +824,14 @@ if run_button:
     if not website_url:
         st.error("Website URL is required.")
 
-    elif not mapping_file:
-        st.error("Mapping JSON is required.")
-
     elif builder_error:
         st.error(builder_error)
+
+    elif use_visual_mapping and mapping_errors:
+        st.error("Generated mapping is not valid. Fix it before running.")
+
+    elif not use_visual_mapping and not mapping_file:
+        st.error("Upload a Mapping JSON or enable Visual Mapping Builder.")
 
     else:
         REPORTS_DIR.mkdir(exist_ok=True)
@@ -495,10 +841,15 @@ if run_button:
                 generated_model,
                 TEMP_MODEL_PATH
             )
-            mapping_data = save_uploaded_json(
-                mapping_file,
-                TEMP_MAPPING_PATH
-            )
+
+            if use_visual_mapping:
+                mapping_data = generated_mapping
+                save_json(mapping_data, TEMP_MAPPING_PATH)
+            else:
+                mapping_data = save_uploaded_json(
+                    mapping_file,
+                    TEMP_MAPPING_PATH
+                )
 
             with st.spinner("Running DFA validation, path generation, graph generation and Selenium execution..."):
                 result = run_framework(
@@ -524,12 +875,12 @@ if run_button:
 result_state = st.session_state.result
 
 if not result_state:
-    st.info("Build a DFA visually, upload a mapping JSON, enter the website URL, then click RUN.")
+    st.info("Build a DFA visually, configure the generated mapping, enter the website URL, then click RUN.")
 
     st.code(
         """
 Pipeline:
-Visual DFA builder -> generated model JSON -> validate -> DFS paths CSV -> graph image -> Selenium execution -> assertions -> screenshots -> summary report
+Visual DFA builder -> generated model JSON -> extract actions -> Visual Mapping Builder -> validate -> DFS paths CSV -> graph image -> Selenium execution -> assertions -> screenshots -> summary report
         """.strip()
     )
 
