@@ -2,17 +2,91 @@
   "total": 2,
   "passed": 1,
   "failed": 1,
+  "total_duration": 14.627,
+  "average_duration": 7.314,
+  "slowest_path": {
+    "path_id": "1",
+    "duration": 7.025
+  },
+  "most_failed_action": {
+    "action": "add_failed",
+    "count": 1
+  },
+  "most_failed_path": {
+    "path_id": "2",
+    "count": 1
+  },
+  "most_failed_state": {
+    "state": "LoginPage",
+    "count": 1
+  },
+  "failed_actions": [
+    {
+      "action": "add_failed",
+      "fail_count": 1
+    }
+  ],
+  "failed_paths": [
+    {
+      "path_id": "2",
+      "fail_count": 1
+    }
+  ],
+  "failed_states": [
+    {
+      "state": "LoginPage",
+      "fail_frequency": 1
+    },
+    {
+      "state": "ProductPage",
+      "fail_frequency": 1
+    },
+    {
+      "state": "AddFailed",
+      "fail_frequency": 1
+    }
+  ],
   "results": [
     {
       "path_id": "1",
       "status": "PASS",
+      "actions": [
+        "login_success",
+        "add_item",
+        "open_cart",
+        "verify_cart"
+      ],
+      "failed_action": null,
+      "failed_action_index": null,
+      "state_trace": [
+        "LoginPage",
+        "ProductPage",
+        "ItemAdded",
+        "CartOpened",
+        "CartVerified"
+      ],
+      "failed_state": null,
+      "duration_seconds": 7.025,
       "screenshot": null,
       "error": null
     },
     {
       "path_id": "2",
       "status": "FAIL",
-      "screenshot": "C:\\Users\\hieup\\Downloads\\DACN\\DoAnChuyenNganh1\\reports\\screenshots\\path_2_add_failed_20260509_201145.png",
+      "actions": [
+        "login_success",
+        "add_failed"
+      ],
+      "failed_action": "add_failed",
+      "failed_action_index": 1,
+      "state_trace": [
+        "LoginPage",
+        "ProductPage",
+        "AddFailed"
+      ],
+      "failed_state": "ProductPage",
+      "duration_seconds": 3.208,
+      "screenshot": "D:\\DACN\\reports\\screenshots\\path_2_add_failed_20260509_190228.png",
       "error": "URL assertion fail: error"
     }
   ]

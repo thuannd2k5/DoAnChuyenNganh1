@@ -49,7 +49,8 @@ def run_framework(
         mapping,
         base_url,
         csv_path,
-        reports_dir=reports_dir
+        reports_dir=reports_dir,
+        model_data=model_data
     )
 
     summary = executor.run_all_from_csv()

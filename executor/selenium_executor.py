@@ -1,6 +1,8 @@
 import os
 import csv
 import json
+import time
+from collections import Counter
 from datetime import datetime
 from urllib.parse import urljoin
 
@@ -26,13 +28,15 @@ class SeleniumExecutor:
         mapping,
         base_url,
         csv_path,
-        reports_dir="reports"
+        reports_dir="reports",
+        model_data=None
     ):
 
         self.mapping = mapping
         self.base_url = base_url
         self.csv_path = csv_path
         self.reports_dir = reports_dir
+        self.model_data = model_data or {}
 
         self.screenshot_folder = os.path.join(
             reports_dir,
@@ -48,6 +52,48 @@ class SeleniumExecutor:
             exist_ok=True
         )
         os.makedirs(reports_dir, exist_ok=True)
+
+    def build_transition_map(self):
+
+        transitions = self.model_data.get(
+            "transitions",
+            []
+        )
+
+        return {
+            (
+                transition["from"],
+                transition["action"]
+            ): transition["to"]
+            for transition in transitions
+        }
+
+    def build_state_trace(self, actions):
+
+        start_state = self.model_data.get("start_state")
+
+        if not start_state:
+            return []
+
+        transition_map = self.build_transition_map()
+        current_state = start_state
+        states = [current_state]
+
+        for action in actions:
+            next_state = transition_map.get(
+                (
+                    current_state,
+                    action
+                )
+            )
+
+            if not next_state:
+                break
+
+            states.append(next_state)
+            current_state = next_state
+
+        return states
 
     def start_driver(self):
 
@@ -250,50 +296,173 @@ class SeleniumExecutor:
         actions
     ):
 
-        driver = self.start_driver()
+        start_time = time.perf_counter()
+        driver = None
         action = "start"
-
-        driver.get(self.base_url)
+        failed_action_index = None
+        state_trace = self.build_state_trace(actions)
 
         try:
 
-            for action in actions:
+            driver = self.start_driver()
+
+            driver.get(self.base_url)
+
+            for index, action in enumerate(actions):
+                failed_action_index = index
                 self.execute_action(
                     driver,
                     action
                 )
 
-            driver.quit()
+            duration = round(
+                time.perf_counter() - start_time,
+                3
+            )
 
             return {
                 "path_id": path_id,
                 "status": "PASS",
+                "actions": actions,
+                "failed_action": None,
+                "failed_action_index": None,
+                "state_trace": state_trace,
+                "failed_state": None,
+                "duration_seconds": duration,
                 "screenshot": None,
                 "error": None
             }
 
         except Exception as e:
 
-            screenshot = self.take_screenshot(
-                driver,
-                path_id,
-                action
+            duration = round(
+                time.perf_counter() - start_time,
+                3
             )
+            screenshot = None
+
+            if driver:
+                screenshot = self.take_screenshot(
+                    driver,
+                    path_id,
+                    action
+                )
+
+            failed_state = None
+
+            if (
+                failed_action_index is not None
+                and failed_action_index < len(state_trace)
+            ):
+                failed_state = state_trace[failed_action_index]
 
             print(f"[FAIL] {e}")
             print(f"Screenshot: {screenshot}")
 
-            driver.quit()
-
             return {
                 "path_id": path_id,
                 "status": "FAIL",
+                "actions": actions,
+                "failed_action": action,
+                "failed_action_index": failed_action_index,
+                "state_trace": state_trace,
+                "failed_state": failed_state,
+                "duration_seconds": duration,
                 "screenshot": screenshot,
                 "error": str(e)
             }
 
+        finally:
+
+            if driver:
+                driver.quit()
+
+    def build_analytics(self, results, total_duration):
+
+        failed_results = [
+            result for result in results
+            if result["status"] == "FAIL"
+        ]
+
+        action_counter = Counter()
+        path_counter = Counter()
+        state_counter = Counter()
+
+        for result in failed_results:
+            failed_action = result.get("failed_action")
+
+            if failed_action:
+                action_counter[failed_action] += 1
+
+            path_counter[str(result["path_id"])] += 1
+
+            for state in result.get("state_trace", []):
+                state_counter[state] += 1
+
+        slowest_result = max(
+            results,
+            key=lambda result: result.get(
+                "duration_seconds",
+                0
+            ),
+            default=None
+        )
+
+        most_failed_action = action_counter.most_common(1)
+        most_failed_path = path_counter.most_common(1)
+        most_failed_state = state_counter.most_common(1)
+
+        return {
+            "total_duration": round(total_duration, 3),
+            "average_duration": round(
+                total_duration / len(results),
+                3
+            ) if results else 0,
+            "slowest_path": {
+                "path_id": slowest_result["path_id"],
+                "duration": slowest_result.get(
+                    "duration_seconds",
+                    0
+                )
+            } if slowest_result else None,
+            "most_failed_action": {
+                "action": most_failed_action[0][0],
+                "count": most_failed_action[0][1]
+            } if most_failed_action else None,
+            "most_failed_path": {
+                "path_id": most_failed_path[0][0],
+                "count": most_failed_path[0][1]
+            } if most_failed_path else None,
+            "most_failed_state": {
+                "state": most_failed_state[0][0],
+                "count": most_failed_state[0][1]
+            } if most_failed_state else None,
+            "failed_actions": [
+                {
+                    "action": action,
+                    "fail_count": count
+                }
+                for action, count in action_counter.most_common()
+            ],
+            "failed_paths": [
+                {
+                    "path_id": path_id,
+                    "fail_count": count
+                }
+                for path_id, count in path_counter.most_common()
+            ],
+            "failed_states": [
+                {
+                    "state": state,
+                    "fail_frequency": count
+                }
+                for state, count in state_counter.most_common()
+            ]
+        }
+
     def run_all_from_csv(self):
 
+        start_time = time.perf_counter()
         paths = self.load_paths_from_csv()
 
         total = len(paths)
@@ -325,10 +494,16 @@ class SeleniumExecutor:
             if result["status"] == "PASS"
         ])
         failed = total - passed
+        total_duration = time.perf_counter() - start_time
+        analytics = self.build_analytics(
+            results,
+            total_duration
+        )
         summary = {
             "total": total,
             "passed": passed,
             "failed": failed,
+            **analytics,
             "results": results
         }
 
@@ -336,6 +511,7 @@ class SeleniumExecutor:
         print(f"TOTAL : {total}")
         print(f"PASS  : {passed}")
         print(f"FAIL  : {failed}")
+        print(f"TIME  : {summary['total_duration']}s")
 
         with open(self.report_path, "w", encoding="utf-8") as file:
             json.dump(summary, file, indent=2, ensure_ascii=False)
