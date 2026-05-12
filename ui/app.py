@@ -6,6 +6,15 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+try:
+    from streamlit_agraph import Config, Edge, Node, agraph
+except ImportError:
+    Config = None
+    Edge = None
+    Node = None
+    agraph = None
+
+
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -27,12 +36,18 @@ TEMP_MAPPING_PATH = REPORTS_DIR / "temp_mapping.json"
 def save_uploaded_json(uploaded_file, output_path):
 
     data = json.load(uploaded_file)
+    save_json(data, output_path)
+
+    return data
+
+
+def save_json(data, output_path):
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(data, indent=2, ensure_ascii=False),
         encoding="utf-8"
     )
-
-    return data
 
 
 def read_csv_if_exists(csv_path):
@@ -76,10 +91,222 @@ def image_exists(image_path):
     return bool(image_path) and Path(image_path).exists()
 
 
+def init_builder_state():
+
+    defaults = {
+        "builder_states": [],
+        "builder_state_labels": {},
+        "builder_transitions": [],
+        "builder_start_state": "",
+        "builder_final_states": [],
+        "builder_model_name": "login_flow",
+        "builder_max_depth": 10
+    }
+
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+def add_state(state_id, state_label):
+
+    state_id = state_id.strip()
+    state_label = state_label.strip()
+
+    if not state_id:
+        st.warning("State ID is required.")
+        return
+
+    if state_id in st.session_state.builder_states:
+        st.warning(f"State already exists: {state_id}")
+        return
+
+    st.session_state.builder_states.append(state_id)
+    st.session_state.builder_state_labels[state_id] = state_label or state_id
+
+    if not st.session_state.builder_start_state:
+        st.session_state.builder_start_state = state_id
+
+    st.success(f"Added state: {state_id}")
+
+
+def add_transition(from_state, to_state, action):
+
+    action = action.strip()
+
+    if not from_state or not to_state:
+        st.warning("From state and to state are required.")
+        return
+
+    if not action:
+        st.warning("Action label is required.")
+        return
+
+    duplicate = any(
+        item["from"] == from_state and item["action"] == action
+        for item in st.session_state.builder_transitions
+    )
+
+    if duplicate:
+        st.warning(
+            "DFA transition already exists for this from state and action."
+        )
+        return
+
+    st.session_state.builder_transitions.append({
+        "from": from_state,
+        "to": to_state,
+        "action": action
+    })
+    st.success(f"Added transition: {from_state} -> {to_state} : {action}")
+
+
+def remove_transition(index):
+
+    if 0 <= index < len(st.session_state.builder_transitions):
+        st.session_state.builder_transitions.pop(index)
+
+
+def import_model_to_builder(model_data):
+
+    states = model_data.get("states", [])
+    transitions = model_data.get("transitions", [])
+
+    st.session_state.builder_states = list(states)
+    st.session_state.builder_state_labels = {
+        state: state
+        for state in states
+    }
+    st.session_state.builder_transitions = [
+        {
+            "from": item.get("from", ""),
+            "to": item.get("to", ""),
+            "action": item.get("action", "")
+        }
+        for item in transitions
+    ]
+    st.session_state.builder_start_state = model_data.get(
+        "start_state",
+        states[0] if states else ""
+    )
+    st.session_state.builder_final_states = model_data.get(
+        "final_states",
+        []
+    )
+    st.session_state.builder_model_name = model_data.get(
+        "model_name",
+        "login_flow"
+    )
+    st.session_state.builder_max_depth = model_data.get("max_depth", 10)
+
+
+def build_dfa_model():
+
+    transitions = st.session_state.builder_transitions
+    alphabet = sorted({
+        item["action"]
+        for item in transitions
+        if item.get("action")
+    })
+
+    return {
+        "model_name": st.session_state.builder_model_name.strip()
+        or "visual_dfa_model",
+        "alphabet": alphabet,
+        "states": st.session_state.builder_states,
+        "start_state": st.session_state.builder_start_state,
+        "final_states": st.session_state.builder_final_states,
+        "max_depth": int(st.session_state.builder_max_depth),
+        "transitions": transitions
+    }
+
+
+def render_visual_graph(model_data):
+
+    if agraph is None:
+        st.error(
+            "Missing dependency: streamlit-agraph. "
+            "Install it with `pip install streamlit-agraph`."
+        )
+        return
+
+    state_labels = st.session_state.builder_state_labels
+    final_states = set(model_data["final_states"])
+
+    nodes = []
+    for state in model_data["states"]:
+        color = "#8fd19e"
+
+        if state in final_states:
+            color = "#f4a7a7"
+
+        if state == model_data["start_state"]:
+            color = "#7cc7ff"
+
+        nodes.append(
+            Node(
+                id=state,
+                label=state_labels.get(state, state),
+                size=28,
+                color=color
+            )
+        )
+
+    edges = [
+        Edge(
+            source=item["from"],
+            target=item["to"],
+            label=item["action"]
+        )
+        for item in model_data["transitions"]
+    ]
+
+    config = Config(
+        width=900,
+        height=420,
+        directed=True,
+        physics=True,
+        hierarchical=False,
+        nodeHighlightBehavior=True,
+        highlightColor="#f6d365",
+        collapsible=False
+    )
+
+    agraph(
+        nodes=nodes,
+        edges=edges,
+        config=config
+    )
+
+
+def validate_builder_model(model_data):
+
+    if not model_data["states"]:
+        return "Add at least one state before running."
+
+    if not model_data["start_state"]:
+        return "Select a start state before running."
+
+    if model_data["start_state"] not in model_data["states"]:
+        return "Start state does not exist in states."
+
+    invalid_finals = [
+        state for state in model_data["final_states"]
+        if state not in model_data["states"]
+    ]
+
+    if invalid_finals:
+        return f"Invalid final states: {', '.join(invalid_finals)}"
+
+    return None
+
+
 st.set_page_config(
     page_title="DFA Web Testing Tool",
     layout="wide"
 )
+
+init_builder_state()
 
 st.title("DFA Web Testing Tool")
 st.caption("Model-Based Testing with DFA, DFS and Selenium")
@@ -89,11 +316,6 @@ st.sidebar.header("Test Configuration")
 website_url = st.sidebar.text_input(
     "Website URL",
     value="https://www.saucedemo.com/"
-)
-
-model_file = st.sidebar.file_uploader(
-    "DFA model JSON",
-    type=["json"]
 )
 
 mapping_file = st.sidebar.file_uploader(
@@ -109,23 +331,168 @@ run_button = st.sidebar.button(
 if "result" not in st.session_state:
     st.session_state.result = None
 
+
+st.subheader("Visual DFA Builder")
+
+builder_left, builder_right = st.columns([1, 1])
+
+with builder_left:
+    st.text_input(
+        "Model name",
+        key="builder_model_name"
+    )
+
+    st.number_input(
+        "Max depth",
+        min_value=1,
+        max_value=100,
+        step=1,
+        key="builder_max_depth"
+    )
+
+    with st.form("add_state_form", clear_on_submit=True):
+        state_id = st.text_input("State ID", placeholder="q0")
+        state_label = st.text_input(
+            "State label (optional)",
+            placeholder="Login Page"
+        )
+        add_state_button = st.form_submit_button(
+            "Add State",
+            use_container_width=True
+        )
+
+        if add_state_button:
+            add_state(state_id, state_label)
+
+    states = st.session_state.builder_states
+
+    if states:
+        st.selectbox(
+            "Start state",
+            options=states,
+            key="builder_start_state"
+        )
+
+        st.multiselect(
+            "Final states",
+            options=states,
+            key="builder_final_states"
+        )
+
+        with st.form("add_transition_form", clear_on_submit=True):
+            from_state = st.selectbox(
+                "From state",
+                options=states,
+                key="transition_from_state"
+            )
+            to_state = st.selectbox(
+                "To state",
+                options=states,
+                key="transition_to_state"
+            )
+            action = st.text_input(
+                "Action label",
+                placeholder="login_success"
+            )
+            add_transition_button = st.form_submit_button(
+                "Add Transition",
+                use_container_width=True
+            )
+
+            if add_transition_button:
+                add_transition(from_state, to_state, action)
+
+    else:
+        st.info("Add states first, then create transitions.")
+
+with builder_right:
+    st.write("Transitions")
+
+    transitions = st.session_state.builder_transitions
+
+    if not transitions:
+        st.info("No transitions yet.")
+
+    for index, transition in enumerate(transitions):
+        c1, c2 = st.columns([5, 1])
+        c1.write(
+            f"{transition['from']} -> {transition['to']} : "
+            f"{transition['action']}"
+        )
+
+        if c2.button("Remove", key=f"remove_transition_{index}"):
+            remove_transition(index)
+            st.rerun()
+
+    uploaded_model = st.file_uploader(
+        "Import existing DFA model JSON (optional)",
+        type=["json"]
+    )
+
+    if uploaded_model and st.button(
+        "Import Model Into Builder",
+        use_container_width=True
+    ):
+        try:
+            import_model_to_builder(json.load(uploaded_model))
+            st.success("Imported model into visual builder.")
+            st.rerun()
+        except Exception as error:
+            st.error(f"Cannot import model: {error}")
+
+
+generated_model = build_dfa_model()
+
+preview_tab, json_tab = st.tabs(
+    [
+        "Graph Preview",
+        "Generated JSON"
+    ]
+)
+
+with preview_tab:
+    render_visual_graph(generated_model)
+
+with json_tab:
+    st.json(generated_model)
+
+    save_col, download_col = st.columns(2)
+
+    if save_col.button(
+        "Save Generated Model",
+        use_container_width=True
+    ):
+        save_json(generated_model, TEMP_MODEL_PATH)
+        st.success(f"Saved model to {TEMP_MODEL_PATH}")
+
+    download_col.download_button(
+        "Download Model JSON",
+        data=json.dumps(generated_model, indent=2, ensure_ascii=False),
+        file_name=f"{generated_model['model_name']}.json",
+        mime="application/json",
+        use_container_width=True
+    )
+
+
 if run_button:
+
+    builder_error = validate_builder_model(generated_model)
 
     if not website_url:
         st.error("Website URL is required.")
 
-    elif not model_file:
-        st.error("DFA model JSON is required.")
-
     elif not mapping_file:
         st.error("Mapping JSON is required.")
+
+    elif builder_error:
+        st.error(builder_error)
 
     else:
         REPORTS_DIR.mkdir(exist_ok=True)
 
         try:
-            model_data = save_uploaded_json(
-                model_file,
+            save_json(
+                generated_model,
                 TEMP_MODEL_PATH
             )
             mapping_data = save_uploaded_json(
@@ -143,7 +510,7 @@ if run_button:
 
             st.session_state.result = {
                 "pipeline": result,
-                "model": model_data,
+                "model": generated_model,
                 "mapping": mapping_data
             }
 
@@ -157,12 +524,12 @@ if run_button:
 result_state = st.session_state.result
 
 if not result_state:
-    st.info("Select a website URL, upload a DFA model JSON and mapping JSON, then click RUN.")
+    st.info("Build a DFA visually, upload a mapping JSON, enter the website URL, then click RUN.")
 
     st.code(
         """
 Pipeline:
-DFA model -> validate -> DFS paths CSV -> graph image -> Selenium execution -> assertions -> screenshots -> summary report
+Visual DFA builder -> generated model JSON -> validate -> DFS paths CSV -> graph image -> Selenium execution -> assertions -> screenshots -> summary report
         """.strip()
     )
 
@@ -375,6 +742,10 @@ else:
         st.subheader("Generated Files")
 
         files = [
+            {
+                "type": "Generated DFA model",
+                "path": str(TEMP_MODEL_PATH)
+            },
             {
                 "type": "CSV paths",
                 "path": result["csv_path"]
