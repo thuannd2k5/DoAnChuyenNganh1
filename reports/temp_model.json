@@ -1,51 +1,44 @@
 {
-  "model_name": "Add To Cart Flow",
+  "model_name": "login_flow",
   "alphabet": [
+    "addToCart",
     "login_success",
-    "add_item",
-    "open_cart",
-    "verify_cart",
-    "add_failed"
+    "payment",
+    "regiser"
   ],
   "states": [
-    "LoginPage",
-    "ProductPage",
-    "ItemAdded",
-    "CartOpened",
-    "CartVerified",
-    "AddFailed"
+    "q0",
+    "q1",
+    "q2",
+    "q3",
+    "q4"
   ],
-  "start_state": "LoginPage",
+  "start_state": "q0",
   "final_states": [
-    "CartVerified",
-    "AddFailed"
+    "q2",
+    "q3"
   ],
   "max_depth": 10,
   "transitions": [
     {
-      "from": "LoginPage",
-      "action": "login_success",
-      "to": "ProductPage"
+      "from": "q0",
+      "to": "q1",
+      "action": "login_success"
     },
     {
-      "from": "ProductPage",
-      "action": "add_item",
-      "to": "ItemAdded"
+      "from": "q0",
+      "to": "q4",
+      "action": "regiser"
     },
     {
-      "from": "ProductPage",
-      "action": "add_failed",
-      "to": "AddFailed"
+      "from": "q1",
+      "to": "q2",
+      "action": "addToCart"
     },
     {
-      "from": "ItemAdded",
-      "action": "open_cart",
-      "to": "CartOpened"
-    },
-    {
-      "from": "CartOpened",
-      "action": "verify_cart",
-      "to": "CartVerified"
+      "from": "q2",
+      "to": "q3",
+      "action": "payment"
     }
   ]
 }

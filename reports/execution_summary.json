@@ -1,93 +1,70 @@
 {
-  "total": 2,
-  "passed": 1,
+  "total": 1,
+  "passed": 0,
   "failed": 1,
-  "total_duration": 14.627,
-  "average_duration": 7.314,
+  "total_duration": 9.37,
+  "average_duration": 9.37,
   "slowest_path": {
     "path_id": "1",
-    "duration": 7.025
+    "duration": 7.041
   },
   "most_failed_action": {
-    "action": "add_failed",
+    "action": "addToCart",
     "count": 1
   },
   "most_failed_path": {
-    "path_id": "2",
+    "path_id": "1",
     "count": 1
   },
   "most_failed_state": {
-    "state": "LoginPage",
+    "state": "q0",
     "count": 1
   },
   "failed_actions": [
     {
-      "action": "add_failed",
+      "action": "addToCart",
       "fail_count": 1
     }
   ],
   "failed_paths": [
     {
-      "path_id": "2",
+      "path_id": "1",
       "fail_count": 1
     }
   ],
   "failed_states": [
     {
-      "state": "LoginPage",
+      "state": "q0",
       "fail_frequency": 1
     },
     {
-      "state": "ProductPage",
+      "state": "q1",
       "fail_frequency": 1
     },
     {
-      "state": "AddFailed",
+      "state": "q2",
       "fail_frequency": 1
     }
   ],
   "results": [
     {
       "path_id": "1",
-      "status": "PASS",
-      "actions": [
-        "login_success",
-        "add_item",
-        "open_cart",
-        "verify_cart"
-      ],
-      "failed_action": null,
-      "failed_action_index": null,
-      "state_trace": [
-        "LoginPage",
-        "ProductPage",
-        "ItemAdded",
-        "CartOpened",
-        "CartVerified"
-      ],
-      "failed_state": null,
-      "duration_seconds": 7.025,
-      "screenshot": null,
-      "error": null
-    },
-    {
-      "path_id": "2",
       "status": "FAIL",
       "actions": [
         "login_success",
-        "add_failed"
+        "addToCart"
       ],
-      "failed_action": "add_failed",
+      "failed_action": "addToCart",
       "failed_action_index": 1,
       "state_trace": [
-        "LoginPage",
-        "ProductPage",
-        "AddFailed"
+        "q0",
+        "q1",
+        "q2"
       ],
-      "failed_state": "ProductPage",
-      "duration_seconds": 3.208,
-      "screenshot": "D:\\DACN\\reports\\screenshots\\path_2_add_failed_20260509_190228.png",
-      "error": "URL assertion fail: error"
+      "failed_state": "q1",
+      "duration_seconds": 7.041,
+      "screenshot": "D:\\DACN\\reports\\screenshots\\path_1_addToCart_20260512_163935.png",
+      "error": "Action not found in mapping: addToCart"
     }
   ]
 }
