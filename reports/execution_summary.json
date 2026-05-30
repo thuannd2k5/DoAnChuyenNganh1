@@ -1,70 +1,44 @@
 {
   "total": 1,
-  "passed": 0,
-  "failed": 1,
-  "total_duration": 9.37,
-  "average_duration": 9.37,
+  "passed": 1,
+  "failed": 0,
+  "total_duration": 11.151,
+  "average_duration": 11.151,
   "slowest_path": {
     "path_id": "1",
-    "duration": 7.041
+    "duration": 9.004
   },
-  "most_failed_action": {
-    "action": "addToCart",
-    "count": 1
-  },
-  "most_failed_path": {
-    "path_id": "1",
-    "count": 1
-  },
-  "most_failed_state": {
-    "state": "q0",
-    "count": 1
-  },
-  "failed_actions": [
-    {
-      "action": "addToCart",
-      "fail_count": 1
-    }
-  ],
-  "failed_paths": [
-    {
-      "path_id": "1",
-      "fail_count": 1
-    }
-  ],
-  "failed_states": [
-    {
-      "state": "q0",
-      "fail_frequency": 1
-    },
-    {
-      "state": "q1",
-      "fail_frequency": 1
-    },
-    {
-      "state": "q2",
-      "fail_frequency": 1
-    }
-  ],
+  "most_failed_action": null,
+  "most_failed_path": null,
+  "most_failed_state": null,
+  "failed_actions": [],
+  "failed_paths": [],
+  "failed_states": [],
   "results": [
     {
       "path_id": "1",
-      "status": "FAIL",
+      "status": "PASS",
       "actions": [
         "login_success",
-        "addToCart"
+        "go_to_cart",
+        "checkout_start",
+        "input_checkout_info",
+        "click_finish"
       ],
-      "failed_action": "addToCart",
-      "failed_action_index": 1,
+      "failed_action": null,
+      "failed_action_index": null,
       "state_trace": [
         "q0",
         "q1",
-        "q2"
+        "q3",
+        "q4",
+        "q5",
+        "q6"
       ],
-      "failed_state": "q1",
-      "duration_seconds": 7.041,
-      "screenshot": "D:\\DACN\\reports\\screenshots\\path_1_addToCart_20260512_163935.png",
-      "error": "Action not found in mapping: addToCart"
+      "failed_state": null,
+      "duration_seconds": 9.004,
+      "screenshot": null,
+      "error": null
     }
   ]
 }

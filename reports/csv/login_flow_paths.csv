@@ -1,2 +1,2 @@
 path_id,actions
-1,"login_success,addToCart"
+1,"login_success,go_to_cart,checkout_start,input_checkout_info,click_finish"

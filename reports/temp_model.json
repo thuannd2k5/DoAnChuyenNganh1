@@ -1,22 +1,26 @@
 {
   "model_name": "login_flow",
   "alphabet": [
-    "addToCart",
+    "add_to_cart",
+    "checkout_start",
+    "click_finish",
+    "go_to_cart",
+    "input_checkout_info",
     "login_success",
-    "payment",
-    "regiser"
+    "select_product"
   ],
   "states": [
     "q0",
     "q1",
     "q2",
     "q3",
-    "q4"
+    "q4",
+    "q5",
+    "q6"
   ],
   "start_state": "q0",
   "final_states": [
-    "q2",
-    "q3"
+    "q6"
   ],
   "max_depth": 10,
   "transitions": [
@@ -26,19 +30,34 @@
       "action": "login_success"
     },
     {
-      "from": "q0",
-      "to": "q4",
-      "action": "regiser"
-    },
-    {
       "from": "q1",
       "to": "q2",
-      "action": "addToCart"
+      "action": "select_product"
     },
     {
       "from": "q2",
+      "to": "q1",
+      "action": "add_to_cart"
+    },
+    {
+      "from": "q1",
       "to": "q3",
-      "action": "payment"
+      "action": "go_to_cart"
+    },
+    {
+      "from": "q3",
+      "to": "q4",
+      "action": "checkout_start"
+    },
+    {
+      "from": "q4",
+      "to": "q5",
+      "action": "input_checkout_info"
+    },
+    {
+      "from": "q5",
+      "to": "q6",
+      "action": "click_finish"
     }
   ]
 }

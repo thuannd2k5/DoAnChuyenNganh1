@@ -37,6 +37,7 @@ STEP_TYPES = [
     "input",
     "assert_text",
     "assert_url",
+    "assert_url_contains",
     "wait",
     "screenshot"
 ]
@@ -56,7 +57,8 @@ STEP_TYPES_WITH_VALUE = {
 }
 STEP_TYPES_WITH_EXPECTED = {
     "assert_text",
-    "assert_url"
+    "assert_url",
+    "assert_url_contains"
 }
 
 
@@ -139,6 +141,8 @@ def init_mapping_builder_state():
 
     if "mapping_builder_steps" not in st.session_state:
         st.session_state.mapping_builder_steps = {}
+    if "mapping_builder_extra_actions" not in st.session_state:
+        st.session_state.mapping_builder_extra_actions = []
 
 
 def create_empty_mapping_step(step_type="click"):
@@ -243,6 +247,8 @@ def import_model_to_builder(model_data):
     )
     st.session_state.builder_max_depth = model_data.get("max_depth", 10)
 
+    # Optional: force refresh UI sau khi import
+    st.experimental_rerun()
 
 def build_dfa_model():
 
@@ -283,18 +289,96 @@ def extract_actions_from_model(model_data):
 def sync_mapping_builder_actions(actions):
 
     current_steps = st.session_state.mapping_builder_steps
+    extra_actions = st.session_state.mapping_builder_extra_actions
+    all_actions = list(actions) + [
+        action for action in extra_actions
+        if action not in actions
+    ]
 
-    for action in actions:
+    for action in all_actions:
         if action not in current_steps:
             current_steps[action] = []
 
     stale_actions = [
         action for action in current_steps
-        if action not in actions
+        if action not in all_actions
     ]
 
     for action in stale_actions:
         del current_steps[action]
+
+
+def import_mapping_to_builder(mapping_data, dfa_actions):
+
+    if not isinstance(mapping_data, dict):
+        return False, ["Mapping JSON must be an object: {action: [steps]}."]
+
+    normalized_steps = {}
+    errors = []
+
+    for raw_action, raw_steps in mapping_data.items():
+        action = str(raw_action).strip()
+
+        if not action:
+            errors.append("Action name cannot be empty.")
+            continue
+
+        if not isinstance(raw_steps, list):
+            errors.append(f"{action}: steps must be a list.")
+            continue
+
+        cleaned_steps = []
+
+        for index, raw_step in enumerate(raw_steps, start=1):
+            if not isinstance(raw_step, dict):
+                errors.append(f"{action} step {index}: step must be an object.")
+                continue
+
+            step_type = str(raw_step.get("type", "")).strip()
+            if not step_type:
+                errors.append(f"{action} step {index}: type is required.")
+                continue
+
+            if step_type not in STEP_TYPES:
+                errors.append(f"{action} step {index}: invalid step type '{step_type}'.")
+                continue
+
+            selector_value = str(raw_step.get("selector", "")).strip()
+            if step_type in STEP_TYPES_WITH_SELECTOR and not selector_value:
+                errors.append(f"{action} step {index}: selector is required.")
+                continue
+
+            step_value = raw_step.get("value", "")
+            if step_type in STEP_TYPES_WITH_VALUE and str(step_value).strip() == "":
+                errors.append(f"{action} step {index}: value is required.")
+                continue
+
+            selector_type = str(raw_step.get("selector_type", "id")).strip() or "id"
+            if selector_type not in SELECTOR_TYPES:
+                selector_type = "id"
+
+            cleaned_steps.append({
+                "type": step_type,
+                "selector_type": selector_type,
+                "selector": selector_value,
+                "value": step_value,
+                "expected": raw_step.get("expected", "")
+            })
+
+        normalized_steps[action] = cleaned_steps
+
+    if errors:
+        return False, errors
+
+    st.session_state.pop("mapping_builder_steps", None)
+    st.session_state.pop("mapping_builder_extra_actions", None)
+    st.session_state.mapping_builder_steps = normalized_steps
+    st.session_state.mapping_builder_extra_actions = [
+        action for action in normalized_steps
+        if action not in dfa_actions
+    ]
+
+    return True, []
 
 
 def add_mapping_step(action):
@@ -495,7 +579,12 @@ def render_visual_mapping_builder(actions):
         "Actions are extracted from DFA transitions. Each action must contain at least one Selenium step."
     )
 
-    for action in actions:
+    all_actions = list(actions) + [
+        action for action in st.session_state.mapping_builder_extra_actions
+        if action not in actions
+    ]
+
+    for action in all_actions:
         steps = st.session_state.mapping_builder_steps[action]
         title = f"Action: {action} ({len(steps)} step{'s' if len(steps) != 1 else ''})"
 
@@ -514,8 +603,8 @@ def render_visual_mapping_builder(actions):
                 add_mapping_step(action)
                 st.rerun()
 
-    mapping = build_mapping_from_builder(actions)
-    errors = validate_mapping_builder(mapping, actions)
+    mapping = build_mapping_from_builder(all_actions)
+    errors = validate_mapping_builder(mapping, all_actions)
 
     preview_col, validation_col = st.columns([1.2, 1])
 
@@ -780,6 +869,32 @@ with builder_right:
 
 generated_model = build_dfa_model()
 generated_actions = extract_actions_from_model(generated_model)
+
+st.subheader("Import Mapping JSON")
+uploaded_mapping_builder = st.file_uploader(
+    "Import mapping into Visual Mapping Builder (optional)",
+    type=["json"],
+    key="mapping_builder_import_file"
+)
+
+if uploaded_mapping_builder and st.button(
+    "Import Mapping Into Builder",
+    use_container_width=True
+):
+    try:
+        imported_mapping_data = json.load(uploaded_mapping_builder)
+        imported_ok, imported_errors = import_mapping_to_builder(
+            imported_mapping_data,
+            generated_actions
+        )
+        if imported_ok:
+            st.success("Imported mapping into visual builder.")
+            st.rerun()
+        else:
+            for imported_error in imported_errors:
+                st.error(imported_error)
+    except Exception as error:
+        st.error(f"Cannot import mapping: {error}")
 
 preview_tab, json_tab = st.tabs(
     [

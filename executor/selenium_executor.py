@@ -1,4 +1,4 @@
-import os
+﻿import os
 import csv
 import json
 import time
@@ -7,6 +7,7 @@ from datetime import datetime
 from urllib.parse import urljoin
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -96,19 +97,15 @@ class SeleniumExecutor:
         return states
 
     def start_driver(self):
-
-        service = Service(
-            ChromeDriverManager().install()
-        )
-
-        driver = webdriver.Chrome(
-            service=service
-        )
+        # ChromeDriver tự download phiên bản tương thích với Chrome hiện tại
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service)
 
         driver.maximize_window()
+        driver.implicitly_wait(10)
 
         return driver
-
+    
     def load_paths_from_csv(self):
 
         paths = []
@@ -182,12 +179,22 @@ class SeleniumExecutor:
 
     def find_element(self, driver, action, condition):
 
-        selector = action["selector"]
         selector_type = action.get("selector_type", "css")
+        selector = str(action["selector"]).strip()
+        prefix = f"{selector_type}="
+
+        if selector.lower().startswith(prefix):
+            selector = selector[len(prefix):].strip()
+
         by = self.get_by(selector_type)
         wait = WebDriverWait(driver, 10)
 
-        return wait.until(condition((by, selector)))
+        try:
+            return wait.until(condition((by, selector)))
+        except TimeoutException as error:
+            raise Exception(
+                f"Element timeout: selector_type='{selector_type}', selector='{selector}'"
+            ) from error
 
     def execute_action(
         self,
@@ -544,3 +551,4 @@ class SeleniumExecutor:
         print(f"Summary report: {self.report_path}")
 
         return summary
+
