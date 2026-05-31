@@ -99,6 +99,10 @@ def build_results_dataframe(results):
             "path_id": item.get("path_id"),
             "dataset_id": item.get("dataset_id"),
             "status": item.get("status"),
+            "dataset_values": json.dumps(
+                item.get("dataset_map_used", {}),
+                ensure_ascii=False
+            ),
             "duration_seconds": item.get("duration_seconds"),
             "failed_action": item.get("failed_action"),
             "failed_state": item.get("failed_state"),
@@ -1269,6 +1273,12 @@ else:
             with st.expander(title, expanded=True):
                 st.write("Error:")
                 st.code(item.get("error") or "")
+
+                st.write("Dataset Values:")
+                st.json(item.get("dataset_map_used", {}))
+
+                st.write("Action Logs:")
+                st.json(item.get("action_logs", []))
 
                 st.write("Actions:")
                 st.code(" -> ".join(item.get("actions", [])))

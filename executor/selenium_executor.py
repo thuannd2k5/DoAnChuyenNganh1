@@ -214,7 +214,9 @@ class SeleniumExecutor:
         driver,
         action_name,
         action_data=None,
-        dataset_values=None
+        dataset_values=None,
+        action_logs=None,
+        root_action_name=None
     ):
 
         if action_data is None:
@@ -224,9 +226,12 @@ class SeleniumExecutor:
                 )
 
             action = self.mapping[action_name]
+            root_action_name = action_name if root_action_name is None else root_action_name
 
         else:
             action = action_data
+            if root_action_name is None:
+                root_action_name = action_name
 
         if isinstance(action, list):
             for index, step in enumerate(action, start=1):
@@ -234,19 +239,47 @@ class SeleniumExecutor:
                     driver,
                     f"{action_name}[{index}]",
                     step,
-                    dataset_values=dataset_values
+                    dataset_values=dataset_values,
+                    action_logs=action_logs,
+                    root_action_name=root_action_name
                 )
+            self.validate_critical_action_result(
+                driver,
+                root_action_name,
+                action
+            )
             return
 
         action_type = action["type"]
+        current_log = {
+            "action": root_action_name or action_name,
+            "step_action": action_name,
+            "step_type": action_type,
+            "dataset_values": dataset_values or {}
+        }
+        if isinstance(action_logs, list):
+            action_logs.append(current_log)
 
         if action_type == "sequence":
 
             for step in action["steps"]:
                 if isinstance(step, dict):
-                    self.execute_action(driver, action_name, step)
+                    self.execute_action(
+                        driver,
+                        action_name,
+                        step,
+                        dataset_values=dataset_values,
+                        action_logs=action_logs,
+                        root_action_name=root_action_name
+                    )
                 else:
-                    self.execute_action(driver, step)
+                    self.execute_action(
+                        driver,
+                        step,
+                        dataset_values=dataset_values,
+                        action_logs=action_logs,
+                        root_action_name=root_action_name
+                    )
 
         elif action_type == "open_url":
 
@@ -265,9 +298,17 @@ class SeleniumExecutor:
 
         elif action_type == "input":
 
+            raw_value = action.get("value", "")
             value = self.resolve_dynamic_value(
-                action.get("value", ""),
+                raw_value,
                 dataset_values
+            )
+            self.validate_input_data_required(
+                action_name=root_action_name or action_name,
+                selector=action.get("selector", ""),
+                raw_value=raw_value,
+                resolved_value=value,
+                dataset_values=dataset_values
             )
 
             element = self.find_element(
@@ -279,6 +320,7 @@ class SeleniumExecutor:
             element.clear()
 
             element.send_keys(value)
+            current_log["resolved_input"] = value
 
         elif action_type == "wait":
 
@@ -313,6 +355,7 @@ class SeleniumExecutor:
                 raise Exception(
                     f"URL assertion fail: {expected}"
                 )
+            current_log["assert_expected"] = expected
 
         elif action_type == "assert_text":
 
@@ -331,6 +374,7 @@ class SeleniumExecutor:
                 raise Exception(
                     f"Text assertion fail: expected '{expected}', actual '{element.text.strip()}'"
                 )
+            current_log["assert_expected"] = expected
 
         elif action_type == "screenshot":
 
@@ -346,6 +390,12 @@ class SeleniumExecutor:
                 f"Unsupported action type: {action_type}"
             )
 
+
+    def action_requires_data(self, action):
+
+        steps = self.mapping.get(action, [])
+        return any(step.get("step_type") in ["input", "select"] for step in steps)
+
     def run_path(
         self,
         path_id,
@@ -359,26 +409,31 @@ class SeleniumExecutor:
         action = "start"
         failed_action_index = None
         state_trace = self.build_state_trace(actions)
+        action_logs = []
 
         try:
-
             driver = self.start_driver()
-
             driver.get(self.base_url)
 
             for index, action in enumerate(actions):
                 failed_action_index = index
                 action_dataset = (dataset_map or {}).get(action, {})
+
+                # Kiểm tra: nếu action có mapping nhưng không có dữ liệu → FAIL
+                if self.action_requires_data(action) and not action_dataset:
+                    raise ValueError(f"Missing test data for action '{action}'")
+
+                # Thực hiện action
                 self.execute_action(
                     driver,
                     action,
-                    dataset_values=action_dataset
+                    dataset_values=action_dataset,
+                    action_logs=action_logs,
+                    root_action_name=action
                 )
 
-            duration = round(
-                time.perf_counter() - start_time,
-                3
-            )
+            duration = round(time.perf_counter() - start_time, 3)
+            self.print_action_logs(path_id, dataset_id, action_logs)
 
             return {
                 "path_id": path_id,
@@ -391,34 +446,26 @@ class SeleniumExecutor:
                 "failed_state": None,
                 "duration_seconds": duration,
                 "screenshot": None,
-                "error": None
+                "error": None,
+                "dataset_map_used": dataset_map or {},
+                "action_logs": action_logs
             }
 
         except Exception as e:
-
-            duration = round(
-                time.perf_counter() - start_time,
-                3
-            )
+            duration = round(time.perf_counter() - start_time, 3)
             screenshot = None
 
             if driver:
-                screenshot = self.take_screenshot(
-                    driver,
-                    path_id,
-                    action
-                )
+                screenshot = self.take_screenshot(driver, path_id, action)
 
             failed_state = None
-
-            if (
-                failed_action_index is not None
-                and failed_action_index < len(state_trace)
-            ):
+            if failed_action_index is not None and failed_action_index < len(state_trace):
                 failed_state = state_trace[failed_action_index]
 
             print(f"[FAIL] {e}")
             print(f"Screenshot: {screenshot}")
+            print(f"DATA USED: {dataset_map}")
+            self.print_action_logs(path_id, dataset_id, action_logs)
 
             return {
                 "path_id": path_id,
@@ -431,13 +478,100 @@ class SeleniumExecutor:
                 "failed_state": failed_state,
                 "duration_seconds": duration,
                 "screenshot": screenshot,
-                "error": str(e)
+                "error": str(e),
+                "dataset_map_used": dataset_map or {},
+                "action_logs": action_logs
             }
 
         finally:
-
             if driver:
                 driver.quit()
+
+    def validate_input_data_required(
+        self,
+        action_name,
+        selector,
+        raw_value,
+        resolved_value,
+        dataset_values
+    ):
+
+        dataset_values = dataset_values or {}
+        raw_value = str(raw_value)
+        resolved_value = str(resolved_value)
+
+        if "{{" in raw_value and "}}" in raw_value:
+            if "{{" in resolved_value or "}}" in resolved_value:
+                raise Exception(
+                    f"Missing dataset value for input action '{action_name}' "
+                    f"(selector='{selector}'). template='{raw_value}', dataset={dataset_values}"
+                )
+
+        if resolved_value.strip() == "":
+            raise Exception(
+                f"Input value is empty for action '{action_name}' "
+                f"(selector='{selector}'). dataset={dataset_values}"
+            )
+
+    def validate_critical_action_result(
+        self,
+        driver,
+        action_name,
+        action_steps
+    ):
+
+        normalized = str(action_name).lower()
+        is_critical = any(
+            token in normalized for token in [
+                "login_success",
+                "login",
+                "submit_login"
+            ]
+        )
+
+        if not is_critical:
+            return
+
+        has_assert_step = any(
+            isinstance(step, dict)
+            and step.get("type") in {
+                "assert_text",
+                "assert_url_contains",
+                "assert_url"
+            }
+            for step in action_steps
+        )
+
+        if has_assert_step:
+            return
+
+        current_url = driver.current_url.lower()
+        if "inventory" not in current_url and "dashboard" not in current_url:
+            raise Exception(
+                f"Critical action '{action_name}' may have failed. "
+                f"Current URL after action: {driver.current_url}"
+            )
+
+    def print_action_logs(
+        self,
+        path_id,
+        dataset_id,
+        action_logs
+    ):
+
+        if not action_logs:
+            return
+
+        print(f"ACTION LOGS PATH {path_id} | DATASET {dataset_id}")
+
+        for item in action_logs:
+            action = item.get("action")
+            step_type = item.get("step_type")
+            data = item.get("dataset_values", {})
+            print(
+                f" - action={action} step={step_type} "
+                f"data={json.dumps(data, ensure_ascii=False)}"
+            )
 
     def build_analytics(self, results, total_duration):
 
@@ -539,16 +673,24 @@ class SeleniumExecutor:
             actions = p["actions"]
 
             for dataset_id in dataset_ids:
-                print(f"\nRUNNING PATH {path_id} | DATASET {dataset_id}")
+                dataset_map = self.build_dataset_map_for_actions(
+                    actions,
+                    dataset_id
+                )
+                dataset_preview = self.format_dataset_preview(
+                    dataset_map
+                )
+
+                print(
+                    f"\nRUNNING PATH {path_id} | DATASET {dataset_id} | "
+                    f"DATA {dataset_preview}"
+                )
 
                 result = self.run_path(
                     path_id,
                     actions,
                     dataset_id=dataset_id,
-                    dataset_map=self.build_dataset_map_for_actions(
-                        actions,
-                        dataset_id
-                    )
+                    dataset_map=dataset_map
                 )
                 results.append(result)
 
@@ -588,6 +730,26 @@ class SeleniumExecutor:
         print(f"Summary report: {self.report_path}")
 
         return summary
+
+    def format_dataset_preview(self, dataset_map):
+
+        if not isinstance(dataset_map, dict) or not dataset_map:
+            return "{}"
+
+        compact = {}
+
+        for action, values in dataset_map.items():
+            if isinstance(values, dict) and values:
+                compact[action] = values
+
+        if not compact:
+            return "{}"
+
+        return json.dumps(
+            compact,
+            ensure_ascii=False,
+            separators=(",", ":")
+        )
 
     def build_dataset_ids(self):
 

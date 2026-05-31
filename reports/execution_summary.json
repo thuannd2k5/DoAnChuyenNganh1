@@ -1,12 +1,12 @@
 {
-  "total": 2,
-  "passed": 2,
+  "total": 6,
+  "passed": 6,
   "failed": 0,
-  "total_duration": 12.299,
-  "average_duration": 6.149,
+  "total_duration": 35.652,
+  "average_duration": 5.942,
   "slowest_path": {
-    "path_id": "1",
-    "duration": 4.163
+    "path_id": "2",
+    "duration": 4.321
   },
   "most_failed_action": null,
   "most_failed_path": null,
@@ -17,6 +17,186 @@
   "results": [
     {
       "path_id": "1",
+      "dataset_id": "row_1",
+      "status": "PASS",
+      "actions": [
+        "login_success",
+        "select_product"
+      ],
+      "failed_action": null,
+      "failed_action_index": null,
+      "state_trace": [
+        "q0",
+        "q1",
+        "q2"
+      ],
+      "failed_state": null,
+      "duration_seconds": 3.714,
+      "screenshot": null,
+      "error": null,
+      "dataset_map_used": {
+        "login_success": {
+          "user-name": "standard_user",
+          "password": "secret_sauce"
+        },
+        "select_product": {}
+      },
+      "action_logs": [
+        {
+          "action": "login_success",
+          "step_action": "login_success[1]",
+          "step_type": "input",
+          "dataset_values": {
+            "user-name": "standard_user",
+            "password": "secret_sauce"
+          },
+          "resolved_input": "standard_user"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[2]",
+          "step_type": "input",
+          "dataset_values": {
+            "user-name": "standard_user",
+            "password": "secret_sauce"
+          },
+          "resolved_input": "secret_sauce"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[3]",
+          "step_type": "click",
+          "dataset_values": {
+            "user-name": "standard_user",
+            "password": "secret_sauce"
+          }
+        },
+        {
+          "action": "select_product",
+          "step_action": "select_product[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        }
+      ]
+    },
+    {
+      "path_id": "1",
+      "dataset_id": "row_2",
+      "status": "PASS",
+      "actions": [
+        "login_success",
+        "select_product"
+      ],
+      "failed_action": null,
+      "failed_action_index": null,
+      "state_trace": [
+        "q0",
+        "q1",
+        "q2"
+      ],
+      "failed_state": null,
+      "duration_seconds": 3.724,
+      "screenshot": null,
+      "error": null,
+      "dataset_map_used": {
+        "login_success": {
+          "user-name": "locked_out",
+          "password": "secret_sauce"
+        },
+        "select_product": {}
+      },
+      "action_logs": [
+        {
+          "action": "login_success",
+          "step_action": "login_success[1]",
+          "step_type": "input",
+          "dataset_values": {
+            "user-name": "locked_out",
+            "password": "secret_sauce"
+          },
+          "resolved_input": "standard_user"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[2]",
+          "step_type": "input",
+          "dataset_values": {
+            "user-name": "locked_out",
+            "password": "secret_sauce"
+          },
+          "resolved_input": "secret_sauce"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[3]",
+          "step_type": "click",
+          "dataset_values": {
+            "user-name": "locked_out",
+            "password": "secret_sauce"
+          }
+        },
+        {
+          "action": "select_product",
+          "step_action": "select_product[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        }
+      ]
+    },
+    {
+      "path_id": "1",
+      "dataset_id": "row_3",
+      "status": "PASS",
+      "actions": [
+        "login_success",
+        "select_product"
+      ],
+      "failed_action": null,
+      "failed_action_index": null,
+      "state_trace": [
+        "q0",
+        "q1",
+        "q2"
+      ],
+      "failed_state": null,
+      "duration_seconds": 3.259,
+      "screenshot": null,
+      "error": null,
+      "dataset_map_used": {
+        "login_success": {},
+        "select_product": {}
+      },
+      "action_logs": [
+        {
+          "action": "login_success",
+          "step_action": "login_success[1]",
+          "step_type": "input",
+          "dataset_values": {},
+          "resolved_input": "standard_user"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[2]",
+          "step_type": "input",
+          "dataset_values": {},
+          "resolved_input": "secret_sauce"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[3]",
+          "step_type": "click",
+          "dataset_values": {}
+        },
+        {
+          "action": "select_product",
+          "step_action": "select_product[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        }
+      ]
+    },
+    {
+      "path_id": "2",
       "dataset_id": "row_1",
       "status": "PASS",
       "actions": [
@@ -37,12 +217,118 @@
         "q6"
       ],
       "failed_state": null,
-      "duration_seconds": 3.889,
+      "duration_seconds": 4.321,
       "screenshot": null,
-      "error": null
+      "error": null,
+      "dataset_map_used": {
+        "login_success": {
+          "user-name": "standard_user",
+          "password": "secret_sauce"
+        },
+        "go_to_cart": {},
+        "checkout_start": {},
+        "input_checkout_info": {
+          "first-name": "Thuan",
+          "last-name": "Nguyen",
+          "postal-code": 123456.0
+        },
+        "click_finish": {}
+      },
+      "action_logs": [
+        {
+          "action": "login_success",
+          "step_action": "login_success[1]",
+          "step_type": "input",
+          "dataset_values": {
+            "user-name": "standard_user",
+            "password": "secret_sauce"
+          },
+          "resolved_input": "standard_user"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[2]",
+          "step_type": "input",
+          "dataset_values": {
+            "user-name": "standard_user",
+            "password": "secret_sauce"
+          },
+          "resolved_input": "secret_sauce"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[3]",
+          "step_type": "click",
+          "dataset_values": {
+            "user-name": "standard_user",
+            "password": "secret_sauce"
+          }
+        },
+        {
+          "action": "go_to_cart",
+          "step_action": "go_to_cart[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        },
+        {
+          "action": "checkout_start",
+          "step_action": "checkout_start[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[1]",
+          "step_type": "input",
+          "dataset_values": {
+            "first-name": "Thuan",
+            "last-name": "Nguyen",
+            "postal-code": 123456.0
+          },
+          "resolved_input": "thuan"
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[2]",
+          "step_type": "input",
+          "dataset_values": {
+            "first-name": "Thuan",
+            "last-name": "Nguyen",
+            "postal-code": 123456.0
+          },
+          "resolved_input": "nguyem"
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[3]",
+          "step_type": "input",
+          "dataset_values": {
+            "first-name": "Thuan",
+            "last-name": "Nguyen",
+            "postal-code": 123456.0
+          },
+          "resolved_input": "123456"
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[4]",
+          "step_type": "click",
+          "dataset_values": {
+            "first-name": "Thuan",
+            "last-name": "Nguyen",
+            "postal-code": 123456.0
+          }
+        },
+        {
+          "action": "click_finish",
+          "step_action": "click_finish[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        }
+      ]
     },
     {
-      "path_id": "1",
+      "path_id": "2",
       "dataset_id": "row_2",
       "status": "PASS",
       "actions": [
@@ -63,9 +349,235 @@
         "q6"
       ],
       "failed_state": null,
-      "duration_seconds": 4.163,
+      "duration_seconds": 4.182,
       "screenshot": null,
-      "error": null
+      "error": null,
+      "dataset_map_used": {
+        "login_success": {
+          "user-name": "locked_out",
+          "password": "secret_sauce"
+        },
+        "go_to_cart": {},
+        "checkout_start": {},
+        "input_checkout_info": {
+          "first-name": "Lan",
+          "last-name": "Tran",
+          "postal-code": 654321.0
+        },
+        "click_finish": {}
+      },
+      "action_logs": [
+        {
+          "action": "login_success",
+          "step_action": "login_success[1]",
+          "step_type": "input",
+          "dataset_values": {
+            "user-name": "locked_out",
+            "password": "secret_sauce"
+          },
+          "resolved_input": "standard_user"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[2]",
+          "step_type": "input",
+          "dataset_values": {
+            "user-name": "locked_out",
+            "password": "secret_sauce"
+          },
+          "resolved_input": "secret_sauce"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[3]",
+          "step_type": "click",
+          "dataset_values": {
+            "user-name": "locked_out",
+            "password": "secret_sauce"
+          }
+        },
+        {
+          "action": "go_to_cart",
+          "step_action": "go_to_cart[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        },
+        {
+          "action": "checkout_start",
+          "step_action": "checkout_start[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[1]",
+          "step_type": "input",
+          "dataset_values": {
+            "first-name": "Lan",
+            "last-name": "Tran",
+            "postal-code": 654321.0
+          },
+          "resolved_input": "thuan"
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[2]",
+          "step_type": "input",
+          "dataset_values": {
+            "first-name": "Lan",
+            "last-name": "Tran",
+            "postal-code": 654321.0
+          },
+          "resolved_input": "nguyem"
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[3]",
+          "step_type": "input",
+          "dataset_values": {
+            "first-name": "Lan",
+            "last-name": "Tran",
+            "postal-code": 654321.0
+          },
+          "resolved_input": "123456"
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[4]",
+          "step_type": "click",
+          "dataset_values": {
+            "first-name": "Lan",
+            "last-name": "Tran",
+            "postal-code": 654321.0
+          }
+        },
+        {
+          "action": "click_finish",
+          "step_action": "click_finish[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        }
+      ]
+    },
+    {
+      "path_id": "2",
+      "dataset_id": "row_3",
+      "status": "PASS",
+      "actions": [
+        "login_success",
+        "go_to_cart",
+        "checkout_start",
+        "input_checkout_info",
+        "click_finish"
+      ],
+      "failed_action": null,
+      "failed_action_index": null,
+      "state_trace": [
+        "q0",
+        "q1",
+        "q3",
+        "q4",
+        "q5",
+        "q6"
+      ],
+      "failed_state": null,
+      "duration_seconds": 3.729,
+      "screenshot": null,
+      "error": null,
+      "dataset_map_used": {
+        "login_success": {},
+        "go_to_cart": {},
+        "checkout_start": {},
+        "input_checkout_info": {
+          "first-name": "Tuan",
+          "last-name": "Nguyen",
+          "postal-code": 1111.0
+        },
+        "click_finish": {}
+      },
+      "action_logs": [
+        {
+          "action": "login_success",
+          "step_action": "login_success[1]",
+          "step_type": "input",
+          "dataset_values": {},
+          "resolved_input": "standard_user"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[2]",
+          "step_type": "input",
+          "dataset_values": {},
+          "resolved_input": "secret_sauce"
+        },
+        {
+          "action": "login_success",
+          "step_action": "login_success[3]",
+          "step_type": "click",
+          "dataset_values": {}
+        },
+        {
+          "action": "go_to_cart",
+          "step_action": "go_to_cart[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        },
+        {
+          "action": "checkout_start",
+          "step_action": "checkout_start[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[1]",
+          "step_type": "input",
+          "dataset_values": {
+            "first-name": "Tuan",
+            "last-name": "Nguyen",
+            "postal-code": 1111.0
+          },
+          "resolved_input": "thuan"
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[2]",
+          "step_type": "input",
+          "dataset_values": {
+            "first-name": "Tuan",
+            "last-name": "Nguyen",
+            "postal-code": 1111.0
+          },
+          "resolved_input": "nguyem"
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[3]",
+          "step_type": "input",
+          "dataset_values": {
+            "first-name": "Tuan",
+            "last-name": "Nguyen",
+            "postal-code": 1111.0
+          },
+          "resolved_input": "123456"
+        },
+        {
+          "action": "input_checkout_info",
+          "step_action": "input_checkout_info[4]",
+          "step_type": "click",
+          "dataset_values": {
+            "first-name": "Tuan",
+            "last-name": "Nguyen",
+            "postal-code": 1111.0
+          }
+        },
+        {
+          "action": "click_finish",
+          "step_action": "click_finish[1]",
+          "step_type": "click",
+          "dataset_values": {}
+        }
+      ]
     }
   ]
 }
