@@ -1,50 +1,81 @@
 {
-  "login_success": {
-    "type": "sequence",
-    "steps": [
-      "input_username",
-      "input_password",
-      "click_login",
-      "verify_login_success"
-    ]
-  },
-  "add_item": {
-    "type": "click",
-    "selector": "#add-to-cart-sauce-labs-backpack",
-    "selector_type": "css"
-  },
-  "add_failed": {
-    "type": "assert_url_contains",
-    "expected": "error"
-  },
-  "open_cart": {
-    "type": "click",
-    "selector": ".shopping_cart_link",
-    "selector_type": "css"
-  },
-  "verify_cart": {
-    "type": "assert_url_contains",
-    "expected": "cart"
-  },
-  "input_username": {
-    "type": "input",
-    "selector": "#user-name",
-    "selector_type": "css",
-    "value": "standard_user"
-  },
-  "input_password": {
-    "type": "input",
-    "selector": "#password",
-    "selector_type": "css",
-    "value": "secret_sauce"
-  },
-  "click_login": {
-    "type": "click",
-    "selector": "#login-button",
-    "selector_type": "css"
-  },
-  "verify_login_success": {
-    "type": "assert_url_contains",
-    "expected": "inventory"
-  }
+  "login_success": [
+    {
+      "type": "input",
+      "selector_type": "id",
+      "selector": "user-name",
+      "value": "{{user-name}}"
+    },
+    {
+      "type": "input",
+      "selector_type": "id",
+      "selector": "password",
+      "value": "{{password}}"
+    },
+    {
+      "type": "click",
+      "selector_type": "id",
+      "selector": "login-button"
+    }
+  ],
+  "select_product": [
+    {
+      "type": "click",
+      "selector_type": "css",
+      "selector": ".inventory_item:nth-child(1) .inventory_item_name"
+    }
+  ],
+  "add_to_cart": [
+    {
+      "type": "click",
+      "selector_type": "css",
+      "selector": ".btn_inventory"
+    }
+  ],
+  "go_to_cart": [
+    {
+      "type": "click",
+      "selector_type": "id",
+      "selector": "shopping_cart_container"
+    }
+  ],
+  "checkout_start": [
+    {
+      "type": "click",
+      "selector_type": "id",
+      "selector": "checkout"
+    }
+  ],
+  "input_checkout_info": [
+    {
+      "type": "input",
+      "selector_type": "id",
+      "selector": "first-name",
+      "value": "{{first-name}}"
+    },
+    {
+      "type": "input",
+      "selector_type": "id",
+      "selector": "last-name",
+      "value": "{{last-name}}"
+    },
+    {
+      "type": "input",
+      "selector_type": "id",
+      "selector": "postal-code",
+      "value": "{{postal-code}}"
+    },
+    {
+      "type": "click",
+      "selector_type": "id",
+      "selector": "continue"
+    }
+  ],
+  "click_finish": [
+    {
+      "type": "click",
+      "selector_type": "id",
+      "selector": "finish"
+    }
+  ]
 }
