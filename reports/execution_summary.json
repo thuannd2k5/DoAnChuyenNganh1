@@ -1,19 +1,71 @@
 {
   "total": 6,
-  "passed": 6,
-  "failed": 0,
-  "total_duration": 35.652,
-  "average_duration": 5.942,
+  "passed": 2,
+  "failed": 4,
+  "total_duration": 34.444,
+  "average_duration": 5.741,
   "slowest_path": {
-    "path_id": "2",
-    "duration": 4.321
+    "path_id": "1",
+    "duration": 4.301
   },
-  "most_failed_action": null,
-  "most_failed_path": null,
-  "most_failed_state": null,
-  "failed_actions": [],
-  "failed_paths": [],
-  "failed_states": [],
+  "most_failed_action": {
+    "action": "login_success",
+    "count": 4
+  },
+  "most_failed_path": {
+    "path_id": "1",
+    "count": 2
+  },
+  "most_failed_state": {
+    "state": "q0",
+    "count": 4
+  },
+  "failed_actions": [
+    {
+      "action": "login_success",
+      "fail_count": 4
+    }
+  ],
+  "failed_paths": [
+    {
+      "path_id": "1",
+      "fail_count": 2
+    },
+    {
+      "path_id": "2",
+      "fail_count": 2
+    }
+  ],
+  "failed_states": [
+    {
+      "state": "q0",
+      "fail_frequency": 4
+    },
+    {
+      "state": "q1",
+      "fail_frequency": 4
+    },
+    {
+      "state": "q2",
+      "fail_frequency": 2
+    },
+    {
+      "state": "q3",
+      "fail_frequency": 2
+    },
+    {
+      "state": "q4",
+      "fail_frequency": 2
+    },
+    {
+      "state": "q5",
+      "fail_frequency": 2
+    },
+    {
+      "state": "q6",
+      "fail_frequency": 2
+    }
+  ],
   "results": [
     {
       "path_id": "1",
@@ -31,7 +83,7 @@
         "q2"
       ],
       "failed_state": null,
-      "duration_seconds": 3.714,
+      "duration_seconds": 4.301,
       "screenshot": null,
       "error": null,
       "dataset_map_used": {
@@ -82,22 +134,22 @@
     {
       "path_id": "1",
       "dataset_id": "row_2",
-      "status": "PASS",
+      "status": "FAIL",
       "actions": [
         "login_success",
         "select_product"
       ],
-      "failed_action": null,
-      "failed_action_index": null,
+      "failed_action": "login_success",
+      "failed_action_index": 0,
       "state_trace": [
         "q0",
         "q1",
         "q2"
       ],
-      "failed_state": null,
-      "duration_seconds": 3.724,
-      "screenshot": null,
-      "error": null,
+      "failed_state": "q0",
+      "duration_seconds": 3.134,
+      "screenshot": "D:\\DACN\\reports\\screenshots\\path_1_login_success_20260531_220520.png",
+      "error": "Critical action 'login_success' may have failed. Current URL after action: https://www.saucedemo.com/",
       "dataset_map_used": {
         "login_success": {
           "user-name": "locked_out",
@@ -114,7 +166,7 @@
             "user-name": "locked_out",
             "password": "secret_sauce"
           },
-          "resolved_input": "standard_user"
+          "resolved_input": "locked_out"
         },
         {
           "action": "login_success",
@@ -134,34 +186,28 @@
             "user-name": "locked_out",
             "password": "secret_sauce"
           }
-        },
-        {
-          "action": "select_product",
-          "step_action": "select_product[1]",
-          "step_type": "click",
-          "dataset_values": {}
         }
       ]
     },
     {
       "path_id": "1",
       "dataset_id": "row_3",
-      "status": "PASS",
+      "status": "FAIL",
       "actions": [
         "login_success",
         "select_product"
       ],
-      "failed_action": null,
-      "failed_action_index": null,
+      "failed_action": "login_success",
+      "failed_action_index": 0,
       "state_trace": [
         "q0",
         "q1",
         "q2"
       ],
-      "failed_state": null,
-      "duration_seconds": 3.259,
-      "screenshot": null,
-      "error": null,
+      "failed_state": "q0",
+      "duration_seconds": 3.217,
+      "screenshot": "D:\\DACN\\reports\\screenshots\\path_1_login_success_20260531_220526.png",
+      "error": "Missing dataset value for action 'login_success'. template='{{user-name}}', dataset={}",
       "dataset_map_used": {
         "login_success": {},
         "select_product": {}
@@ -171,26 +217,6 @@
           "action": "login_success",
           "step_action": "login_success[1]",
           "step_type": "input",
-          "dataset_values": {},
-          "resolved_input": "standard_user"
-        },
-        {
-          "action": "login_success",
-          "step_action": "login_success[2]",
-          "step_type": "input",
-          "dataset_values": {},
-          "resolved_input": "secret_sauce"
-        },
-        {
-          "action": "login_success",
-          "step_action": "login_success[3]",
-          "step_type": "click",
-          "dataset_values": {}
-        },
-        {
-          "action": "select_product",
-          "step_action": "select_product[1]",
-          "step_type": "click",
           "dataset_values": {}
         }
       ]
@@ -217,7 +243,7 @@
         "q6"
       ],
       "failed_state": null,
-      "duration_seconds": 4.321,
+      "duration_seconds": 4.08,
       "screenshot": null,
       "error": null,
       "dataset_map_used": {
@@ -285,7 +311,7 @@
             "last-name": "Nguyen",
             "postal-code": 123456.0
           },
-          "resolved_input": "thuan"
+          "resolved_input": "Thuan"
         },
         {
           "action": "input_checkout_info",
@@ -296,7 +322,7 @@
             "last-name": "Nguyen",
             "postal-code": 123456.0
           },
-          "resolved_input": "nguyem"
+          "resolved_input": "Nguyen"
         },
         {
           "action": "input_checkout_info",
@@ -307,7 +333,7 @@
             "last-name": "Nguyen",
             "postal-code": 123456.0
           },
-          "resolved_input": "123456"
+          "resolved_input": "123456.0"
         },
         {
           "action": "input_checkout_info",
@@ -330,7 +356,7 @@
     {
       "path_id": "2",
       "dataset_id": "row_2",
-      "status": "PASS",
+      "status": "FAIL",
       "actions": [
         "login_success",
         "go_to_cart",
@@ -338,8 +364,8 @@
         "input_checkout_info",
         "click_finish"
       ],
-      "failed_action": null,
-      "failed_action_index": null,
+      "failed_action": "login_success",
+      "failed_action_index": 0,
       "state_trace": [
         "q0",
         "q1",
@@ -348,10 +374,10 @@
         "q5",
         "q6"
       ],
-      "failed_state": null,
-      "duration_seconds": 4.182,
-      "screenshot": null,
-      "error": null,
+      "failed_state": "q0",
+      "duration_seconds": 3.5,
+      "screenshot": "D:\\DACN\\reports\\screenshots\\path_2_login_success_20260531_220537.png",
+      "error": "Critical action 'login_success' may have failed. Current URL after action: https://www.saucedemo.com/",
       "dataset_map_used": {
         "login_success": {
           "user-name": "locked_out",
@@ -375,7 +401,7 @@
             "user-name": "locked_out",
             "password": "secret_sauce"
           },
-          "resolved_input": "standard_user"
+          "resolved_input": "locked_out"
         },
         {
           "action": "login_success",
@@ -395,74 +421,13 @@
             "user-name": "locked_out",
             "password": "secret_sauce"
           }
-        },
-        {
-          "action": "go_to_cart",
-          "step_action": "go_to_cart[1]",
-          "step_type": "click",
-          "dataset_values": {}
-        },
-        {
-          "action": "checkout_start",
-          "step_action": "checkout_start[1]",
-          "step_type": "click",
-          "dataset_values": {}
-        },
-        {
-          "action": "input_checkout_info",
-          "step_action": "input_checkout_info[1]",
-          "step_type": "input",
-          "dataset_values": {
-            "first-name": "Lan",
-            "last-name": "Tran",
-            "postal-code": 654321.0
-          },
-          "resolved_input": "thuan"
-        },
-        {
-          "action": "input_checkout_info",
-          "step_action": "input_checkout_info[2]",
-          "step_type": "input",
-          "dataset_values": {
-            "first-name": "Lan",
-            "last-name": "Tran",
-            "postal-code": 654321.0
-          },
-          "resolved_input": "nguyem"
-        },
-        {
-          "action": "input_checkout_info",
-          "step_action": "input_checkout_info[3]",
-          "step_type": "input",
-          "dataset_values": {
-            "first-name": "Lan",
-            "last-name": "Tran",
-            "postal-code": 654321.0
-          },
-          "resolved_input": "123456"
-        },
-        {
-          "action": "input_checkout_info",
-          "step_action": "input_checkout_info[4]",
-          "step_type": "click",
-          "dataset_values": {
-            "first-name": "Lan",
-            "last-name": "Tran",
-            "postal-code": 654321.0
-          }
-        },
-        {
-          "action": "click_finish",
-          "step_action": "click_finish[1]",
-          "step_type": "click",
-          "dataset_values": {}
         }
       ]
     },
     {
       "path_id": "2",
       "dataset_id": "row_3",
-      "status": "PASS",
+      "status": "FAIL",
       "actions": [
         "login_success",
         "go_to_cart",
@@ -470,8 +435,8 @@
         "input_checkout_info",
         "click_finish"
       ],
-      "failed_action": null,
-      "failed_action_index": null,
+      "failed_action": "login_success",
+      "failed_action_index": 0,
       "state_trace": [
         "q0",
         "q1",
@@ -480,10 +445,10 @@
         "q5",
         "q6"
       ],
-      "failed_state": null,
-      "duration_seconds": 3.729,
-      "screenshot": null,
-      "error": null,
+      "failed_state": "q0",
+      "duration_seconds": 3.219,
+      "screenshot": "D:\\DACN\\reports\\screenshots\\path_2_login_success_20260531_220543.png",
+      "error": "Missing dataset value for action 'login_success'. template='{{user-name}}', dataset={}",
       "dataset_map_used": {
         "login_success": {},
         "go_to_cart": {},
@@ -500,81 +465,6 @@
           "action": "login_success",
           "step_action": "login_success[1]",
           "step_type": "input",
-          "dataset_values": {},
-          "resolved_input": "standard_user"
-        },
-        {
-          "action": "login_success",
-          "step_action": "login_success[2]",
-          "step_type": "input",
-          "dataset_values": {},
-          "resolved_input": "secret_sauce"
-        },
-        {
-          "action": "login_success",
-          "step_action": "login_success[3]",
-          "step_type": "click",
-          "dataset_values": {}
-        },
-        {
-          "action": "go_to_cart",
-          "step_action": "go_to_cart[1]",
-          "step_type": "click",
-          "dataset_values": {}
-        },
-        {
-          "action": "checkout_start",
-          "step_action": "checkout_start[1]",
-          "step_type": "click",
-          "dataset_values": {}
-        },
-        {
-          "action": "input_checkout_info",
-          "step_action": "input_checkout_info[1]",
-          "step_type": "input",
-          "dataset_values": {
-            "first-name": "Tuan",
-            "last-name": "Nguyen",
-            "postal-code": 1111.0
-          },
-          "resolved_input": "thuan"
-        },
-        {
-          "action": "input_checkout_info",
-          "step_action": "input_checkout_info[2]",
-          "step_type": "input",
-          "dataset_values": {
-            "first-name": "Tuan",
-            "last-name": "Nguyen",
-            "postal-code": 1111.0
-          },
-          "resolved_input": "nguyem"
-        },
-        {
-          "action": "input_checkout_info",
-          "step_action": "input_checkout_info[3]",
-          "step_type": "input",
-          "dataset_values": {
-            "first-name": "Tuan",
-            "last-name": "Nguyen",
-            "postal-code": 1111.0
-          },
-          "resolved_input": "123456"
-        },
-        {
-          "action": "input_checkout_info",
-          "step_action": "input_checkout_info[4]",
-          "step_type": "click",
-          "dataset_values": {
-            "first-name": "Tuan",
-            "last-name": "Nguyen",
-            "postal-code": 1111.0
-          }
-        },
-        {
-          "action": "click_finish",
-          "step_action": "click_finish[1]",
-          "step_type": "click",
           "dataset_values": {}
         }
       ]

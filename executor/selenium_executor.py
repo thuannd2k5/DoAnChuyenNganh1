@@ -210,192 +210,157 @@ class SeleniumExecutor:
             ) from error
 
     def execute_action(
-        self,
-        driver,
-        action_name,
-        action_data=None,
-        dataset_values=None,
-        action_logs=None,
-        root_action_name=None
-    ):
+            self,
+            driver,
+            action_name,
+            action_data=None,
+            dataset_values=None,
+            action_logs=None,
+            root_action_name=None
+        ):
+            if action_data is None:
+                if action_name not in self.mapping:
+                    raise Exception(f"Action not found in mapping: {action_name}")
+                action = self.mapping[action_name]
+                root_action_name = action_name if root_action_name is None else root_action_name
+            else:
+                action = action_data
+                if root_action_name is None:
+                    root_action_name = action_name
 
-        if action_data is None:
-            if action_name not in self.mapping:
-                raise Exception(
-                    f"Action not found in mapping: {action_name}"
-                )
-
-            action = self.mapping[action_name]
-            root_action_name = action_name if root_action_name is None else root_action_name
-
-        else:
-            action = action_data
-            if root_action_name is None:
-                root_action_name = action_name
-
-        if isinstance(action, list):
-            for index, step in enumerate(action, start=1):
-                self.execute_action(
-                    driver,
-                    f"{action_name}[{index}]",
-                    step,
-                    dataset_values=dataset_values,
-                    action_logs=action_logs,
-                    root_action_name=root_action_name
-                )
-            self.validate_critical_action_result(
-                driver,
-                root_action_name,
-                action
-            )
-            return
-
-        action_type = action["type"]
-        current_log = {
-            "action": root_action_name or action_name,
-            "step_action": action_name,
-            "step_type": action_type,
-            "dataset_values": dataset_values or {}
-        }
-        if isinstance(action_logs, list):
-            action_logs.append(current_log)
-
-        if action_type == "sequence":
-
-            for step in action["steps"]:
-                if isinstance(step, dict):
+            if isinstance(action, list):
+                for index, step in enumerate(action, start=1):
                     self.execute_action(
                         driver,
-                        action_name,
+                        f"{action_name}[{index}]",
                         step,
                         dataset_values=dataset_values,
                         action_logs=action_logs,
                         root_action_name=root_action_name
                     )
+                self.validate_critical_action_result(driver, root_action_name, action)
+                return
+
+            action_type = action["type"]
+
+            current_log = {
+                "action": root_action_name or action_name,
+                "step_action": action_name,
+                "step_type": action_type,
+                "dataset_values": dataset_values or {}
+            }
+            if isinstance(action_logs, list):
+                action_logs.append(current_log)
+
+            if action_type == "sequence":
+                for step in action["steps"]:
+                    if isinstance(step, dict):
+                        self.execute_action(
+                            driver,
+                            action_name,
+                            step,
+                            dataset_values=dataset_values,
+                            action_logs=action_logs,
+                            root_action_name=root_action_name
+                        )
+                    else:
+                        self.execute_action(
+                            driver,
+                            step,
+                            dataset_values=dataset_values,
+                            action_logs=action_logs,
+                            root_action_name=root_action_name
+                        )
+                return
+
+            if action_type == "open_url":
+                path = action.get("path", "/")
+                driver.get(urljoin(self.base_url, path))
+                return
+
+            if action_type == "click":
+                element = self.find_element(driver, action, EC.element_to_be_clickable)
+                element.click()
+                return
+
+            if action_type in ("input", "select"):
+                raw_value = action.get("value", "")
+                resolved_value = self.resolve_dynamic_value(raw_value, dataset_values)
+                value_str = str(resolved_value).strip()
+
+                if "{{" in str(raw_value) and ("{{" in str(resolved_value) or "}}" in str(resolved_value)):
+                    raise Exception(
+                        f"Missing dataset value for action '{root_action_name or action_name}'. "
+                        f"template='{raw_value}', dataset={dataset_values}"
+                    )
+                if not dataset_values and value_str == "":
+                    raise Exception(
+                        f"Input/select action '{root_action_name or action_name}' requires dataset value, "
+                        f"but dataset is empty."
+                    )
+                if value_str == "":
+                    raise Exception(
+                        f"Input/select action '{root_action_name or action_name}' has empty value after resolve. "
+                        f"dataset={dataset_values}"
+                    )
+
+                element = self.find_element(driver, action, EC.presence_of_element_located)
+
+                if action_type == "input":
+                    element.clear()
+                    element.send_keys(resolved_value)
+                    current_log["resolved_input"] = resolved_value
                 else:
-                    self.execute_action(
-                        driver,
-                        step,
-                        dataset_values=dataset_values,
-                        action_logs=action_logs,
-                        root_action_name=root_action_name
+                    from selenium.webdriver.support.ui import Select
+                    select_el = Select(element)
+                    try:
+                        select_el.select_by_visible_text(str(resolved_value))
+                    except Exception:
+                        select_el.select_by_value(str(resolved_value))
+                    current_log["resolved_select"] = resolved_value
+                return
+
+            if action_type == "wait":
+                element = self.find_element(driver, action, EC.visibility_of_element_located)
+                if not assert_element_visible(element):
+                    raise Exception("Element is not visible")
+                return
+
+            if action_type == "wait_url":
+                expected = action["value"]
+                wait = WebDriverWait(driver, 10)
+                wait.until(EC.url_contains(expected))
+                return
+
+            if action_type in ("assert_url_contains", "assert_url"):
+                expected = self.resolve_dynamic_value(action.get("expected", ""), dataset_values)
+                ok = assert_url_contains(driver, expected)
+                if not ok:
+                    raise Exception(f"URL assertion fail: {expected}")
+                current_log["assert_expected"] = expected
+                return
+
+            if action_type == "assert_text":
+                expected = self.resolve_dynamic_value(action.get("expected", ""), dataset_values)
+                element = self.find_element(driver, action, EC.presence_of_element_located)
+                if not assert_text(element, expected):
+                    raise Exception(
+                        f"Text assertion fail: expected '{expected}', actual '{element.text.strip()}'"
                     )
+                current_log["assert_expected"] = expected
+                return
 
-        elif action_type == "open_url":
+            if action_type == "screenshot":
+                self.take_screenshot(driver, "manual", action_name)
+                return
 
-            path = action.get("path", "/")
-            driver.get(urljoin(self.base_url, path))
-
-        elif action_type == "click":
-
-            element = self.find_element(
-                driver,
-                action,
-                EC.element_to_be_clickable
-            )
-
-            element.click()
-
-        elif action_type == "input":
-
-            raw_value = action.get("value", "")
-            value = self.resolve_dynamic_value(
-                raw_value,
-                dataset_values
-            )
-            self.validate_input_data_required(
-                action_name=root_action_name or action_name,
-                selector=action.get("selector", ""),
-                raw_value=raw_value,
-                resolved_value=value,
-                dataset_values=dataset_values
-            )
-
-            element = self.find_element(
-                driver,
-                action,
-                EC.presence_of_element_located
-            )
-
-            element.clear()
-
-            element.send_keys(value)
-            current_log["resolved_input"] = value
-
-        elif action_type == "wait":
-
-            element = self.find_element(
-                driver,
-                action,
-                EC.visibility_of_element_located
-            )
-
-            if not assert_element_visible(element):
-                raise Exception("Element is not visible")
-
-        elif action_type == "wait_url":
-
-            expected = action["value"]
-            wait = WebDriverWait(driver, 10)
-            wait.until(EC.url_contains(expected))
-
-        elif action_type in ("assert_url_contains", "assert_url"):
-
-            expected = self.resolve_dynamic_value(
-                action.get("expected", ""),
-                dataset_values
-            )
-
-            ok = assert_url_contains(
-                driver,
-                expected
-            )
-
-            if not ok:
-                raise Exception(
-                    f"URL assertion fail: {expected}"
-                )
-            current_log["assert_expected"] = expected
-
-        elif action_type == "assert_text":
-
-            expected = self.resolve_dynamic_value(
-                action.get("expected", ""),
-                dataset_values
-            )
-
-            element = self.find_element(
-                driver,
-                action,
-                EC.presence_of_element_located
-            )
-
-            if not assert_text(element, expected):
-                raise Exception(
-                    f"Text assertion fail: expected '{expected}', actual '{element.text.strip()}'"
-                )
-            current_log["assert_expected"] = expected
-
-        elif action_type == "screenshot":
-
-            self.take_screenshot(
-                driver,
-                "manual",
-                action_name
-            )
-
-        else:
-
-            raise ValueError(
-                f"Unsupported action type: {action_type}"
-            )
-
+            raise ValueError(f"Unsupported action type: {action_type}")
 
     def action_requires_data(self, action):
 
         steps = self.mapping.get(action, [])
         return any(step.get("step_type") in ["input", "select"] for step in steps)
-
+    
     def run_path(
         self,
         path_id,

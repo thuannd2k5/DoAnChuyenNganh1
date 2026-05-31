@@ -4,13 +4,13 @@
       "type": "input",
       "selector_type": "id",
       "selector": "user-name",
-      "value": "standard_user"
+      "value": "{{user-name}}"
     },
     {
       "type": "input",
       "selector_type": "id",
       "selector": "password",
-      "value": "secret_sauce"
+      "value": "{{password}}"
     },
     {
       "type": "click",
@@ -51,19 +51,19 @@
       "type": "input",
       "selector_type": "id",
       "selector": "first-name",
-      "value": "thuan"
+      "value": "{{first-name}}"
     },
     {
       "type": "input",
       "selector_type": "id",
       "selector": "last-name",
-      "value": "nguyem"
+      "value": "{{last-name}}"
     },
     {
       "type": "input",
       "selector_type": "id",
       "selector": "postal-code",
-      "value": "123456"
+      "value": "{{postal-code}}"
     },
     {
       "type": "click",
