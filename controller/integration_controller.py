@@ -14,7 +14,8 @@ def run_framework(
     base_url,
     model_path,
     mapping_path,
-    reports_dir="reports"
+    reports_dir="reports",
+    test_data=None
 ):
 
     os.makedirs(reports_dir, exist_ok=True)
@@ -50,7 +51,8 @@ def run_framework(
         base_url,
         csv_path,
         reports_dir=reports_dir,
-        model_data=model_data
+        model_data=model_data,
+        test_data=test_data
     )
 
     summary = executor.run_all_from_csv()

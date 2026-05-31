@@ -1,5 +1,6 @@
 import json
 import importlib
+import re
 import sys
 from pathlib import Path
 
@@ -96,6 +97,7 @@ def build_results_dataframe(results):
     for item in results:
         rows.append({
             "path_id": item.get("path_id"),
+            "dataset_id": item.get("dataset_id"),
             "status": item.get("status"),
             "duration_seconds": item.get("duration_seconds"),
             "failed_action": item.get("failed_action"),
@@ -103,6 +105,114 @@ def build_results_dataframe(results):
             "error": item.get("error"),
             "screenshot": item.get("screenshot")
         })
+
+    return pd.DataFrame(rows)
+
+
+def validate_test_data_csv(dataframe):
+
+    if "action" not in dataframe.columns:
+        return False, "CSV must include 'action' column."
+
+    cleaned = dataframe.dropna(how="all").copy()
+    if cleaned.empty:
+        return False, "CSV has no valid data rows."
+
+    cleaned["action"] = cleaned["action"].astype(str).str.strip()
+    cleaned = cleaned[cleaned["action"] != ""]
+
+    if cleaned.empty:
+        return False, "CSV has no valid action rows."
+
+    return True, None
+
+
+def convert_test_data_csv_to_json(dataframe):
+
+    output = {}
+    rows = dataframe.dropna(how="all").to_dict(orient="records")
+    data_columns = [
+        col for col in dataframe.columns
+        if col != "action"
+    ]
+
+    for row in rows:
+        action = str(row.get("action", "")).strip()
+
+        if not action:
+            continue
+
+        payload = {}
+
+        for column in data_columns:
+            value = row.get(column)
+
+            if pd.isna(value):
+                continue
+
+            payload[column] = value
+
+        output.setdefault(action, []).append(payload)
+
+    return output
+
+
+def extract_dynamic_fields(text):
+
+    if not isinstance(text, str):
+        return []
+
+    matches = re.findall(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}", text)
+    return [item.strip() for item in matches if item.strip()]
+
+
+def build_data_template_dataframe(mapping_data):
+
+    if not isinstance(mapping_data, dict):
+        return pd.DataFrame()
+
+    ordered_fields = []
+    seen = set()
+
+    for action_steps in mapping_data.values():
+        if not isinstance(action_steps, list):
+            continue
+
+        for step_index, step in enumerate(action_steps, start=1):
+            if not isinstance(step, dict):
+                continue
+
+            step_type = step.get("type", "")
+
+            if step_type == "input":
+                placeholder_fields = extract_dynamic_fields(step.get("value", ""))
+
+                if placeholder_fields:
+                    for field in placeholder_fields:
+                        if field not in seen:
+                            seen.add(field)
+                            ordered_fields.append(field)
+                else:
+                    auto_field = f"input_{step_index}_value"
+                    if auto_field not in seen:
+                        seen.add(auto_field)
+                        ordered_fields.append(auto_field)
+
+            if step_type in {"assert_text", "assert_url_contains", "assert_url"}:
+                placeholder_fields = extract_dynamic_fields(step.get("expected", ""))
+
+                if placeholder_fields:
+                    for field in placeholder_fields:
+                        if field not in seen:
+                            seen.add(field)
+                            ordered_fields.append(field)
+
+    rows = []
+    for action in mapping_data:
+        row = {"action": action}
+        for field in ordered_fields:
+            row[field] = ""
+        rows.append(row)
 
     return pd.DataFrame(rows)
 
@@ -749,8 +859,24 @@ use_visual_mapping = st.sidebar.checkbox(
     value=True
 )
 
+if "test_data" not in st.session_state:
+    st.session_state.test_data = {}
+
+if "test_data_template_df" not in st.session_state:
+    st.session_state.test_data_template_df = pd.DataFrame()
+
+generate_template_button = st.sidebar.button(
+    "Generate CSV Template",
+    use_container_width=True
+)
+
+test_data_file = st.sidebar.file_uploader(
+    "Upload CSV Test Data",
+    type=["csv"]
+)
+
 run_button = st.sidebar.button(
-    "RUN",
+    "Run Test Data-driven",
     use_container_width=True
 )
 
@@ -931,6 +1057,56 @@ generated_mapping, mapping_errors = render_visual_mapping_builder(
     generated_actions
 )
 
+current_mapping_data = {}
+if use_visual_mapping:
+    current_mapping_data = generated_mapping
+elif mapping_file:
+    try:
+        current_mapping_data = json.load(mapping_file)
+        mapping_file.seek(0)
+    except Exception as error:
+        st.error(f"Cannot read fallback mapping JSON: {error}")
+        current_mapping_data = {}
+
+if generate_template_button:
+    template_df = build_data_template_dataframe(current_mapping_data)
+
+    if template_df.empty:
+        st.error("Cannot generate template. Mapping is empty or invalid.")
+    else:
+        st.session_state.test_data_template_df = template_df
+        st.success("CSV template generated.")
+
+template_df = st.session_state.test_data_template_df
+
+if not template_df.empty:
+    st.subheader("CSV Template")
+    st.dataframe(template_df, use_container_width=True)
+    st.download_button(
+        "Download CSV Template",
+        data=template_df.to_csv(index=False),
+        file_name="test_data_template.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+if test_data_file is not None:
+    try:
+        test_data_df = pd.read_csv(test_data_file)
+        valid_csv, csv_error = validate_test_data_csv(test_data_df)
+
+        if not valid_csv:
+            st.error(csv_error)
+            st.session_state.test_data = {}
+        else:
+            st.session_state.test_data = convert_test_data_csv_to_json(test_data_df)
+            st.success("CSV test data uploaded and converted.")
+            st.json(st.session_state.test_data)
+
+    except Exception as error:
+        st.error(f"Cannot parse CSV test data: {error}")
+        st.session_state.test_data = {}
+
 
 if run_button:
 
@@ -961,6 +1137,7 @@ if run_button:
                 mapping_data = generated_mapping
                 save_json(mapping_data, TEMP_MAPPING_PATH)
             else:
+                mapping_file.seek(0)
                 mapping_data = save_uploaded_json(
                     mapping_file,
                     TEMP_MAPPING_PATH
@@ -971,7 +1148,8 @@ if run_button:
                     base_url=website_url,
                     model_path=str(TEMP_MODEL_PATH),
                     mapping_path=str(TEMP_MAPPING_PATH),
-                    reports_dir=str(REPORTS_DIR)
+                    reports_dir=str(REPORTS_DIR),
+                    test_data=st.session_state.test_data
                 )
 
             st.session_state.result = {
@@ -1036,6 +1214,13 @@ else:
 
     with tab_summary:
         st.subheader("Execution Summary")
+        st.download_button(
+            "Download Summary JSON",
+            data=json.dumps(summary, indent=2, ensure_ascii=False),
+            file_name="execution_summary.json",
+            mime="application/json",
+            use_container_width=True
+        )
 
         results_df = build_results_dataframe(
             summary.get("results", [])
@@ -1076,6 +1261,7 @@ else:
         for item in failed_results:
             title = (
                 f"Path {item.get('path_id')} | "
+                f"Dataset {item.get('dataset_id', 'row_1')} | "
                 f"Action: {item.get('failed_action')} | "
                 f"{item.get('duration_seconds')}s"
             )

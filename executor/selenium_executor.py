@@ -30,7 +30,8 @@ class SeleniumExecutor:
         base_url,
         csv_path,
         reports_dir="reports",
-        model_data=None
+        model_data=None,
+        test_data=None
     ):
 
         self.mapping = mapping
@@ -38,6 +39,7 @@ class SeleniumExecutor:
         self.csv_path = csv_path
         self.reports_dir = reports_dir
         self.model_data = model_data or {}
+        self.test_data = test_data or {}
 
         self.screenshot_folder = os.path.join(
             reports_dir,
@@ -97,11 +99,22 @@ class SeleniumExecutor:
         return states
 
     def start_driver(self):
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument("--disable-notifications")      #  Giữ - tắt thông báo
+        chrome_options.add_argument("--start-maximized")            #  Giữ - mở full màn hình
+        chrome_options.add_argument("--incognito")
+        chrome_options.add_argument("--disable-features=PasswordLeakDetection")  # Giữ - fix lỗi của bạn
+
+        chrome_options.add_experimental_option("prefs", {
+            "credentials_enable_service": False,
+            "profile.password_manager_enabled": False,
+            "profile.password_manager_leak_detection": False,
+            "safebrowsing.enabled": False
+        })
         # ChromeDriver tự download phiên bản tương thích với Chrome hiện tại
         service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service)
+        driver = webdriver.Chrome(service=service,options=chrome_options)
 
-        driver.maximize_window()
         driver.implicitly_wait(10)
 
         return driver
@@ -200,7 +213,8 @@ class SeleniumExecutor:
         self,
         driver,
         action_name,
-        action_data=None
+        action_data=None,
+        dataset_values=None
     ):
 
         if action_data is None:
@@ -219,7 +233,8 @@ class SeleniumExecutor:
                 self.execute_action(
                     driver,
                     f"{action_name}[{index}]",
-                    step
+                    step,
+                    dataset_values=dataset_values
                 )
             return
 
@@ -250,7 +265,10 @@ class SeleniumExecutor:
 
         elif action_type == "input":
 
-            value = action["value"]
+            value = self.resolve_dynamic_value(
+                action.get("value", ""),
+                dataset_values
+            )
 
             element = self.find_element(
                 driver,
@@ -281,7 +299,10 @@ class SeleniumExecutor:
 
         elif action_type in ("assert_url_contains", "assert_url"):
 
-            expected = action["expected"]
+            expected = self.resolve_dynamic_value(
+                action.get("expected", ""),
+                dataset_values
+            )
 
             ok = assert_url_contains(
                 driver,
@@ -295,7 +316,10 @@ class SeleniumExecutor:
 
         elif action_type == "assert_text":
 
-            expected = action["expected"]
+            expected = self.resolve_dynamic_value(
+                action.get("expected", ""),
+                dataset_values
+            )
 
             element = self.find_element(
                 driver,
@@ -325,7 +349,9 @@ class SeleniumExecutor:
     def run_path(
         self,
         path_id,
-        actions
+        actions,
+        dataset_id="row_1",
+        dataset_map=None
     ):
 
         start_time = time.perf_counter()
@@ -342,9 +368,11 @@ class SeleniumExecutor:
 
             for index, action in enumerate(actions):
                 failed_action_index = index
+                action_dataset = (dataset_map or {}).get(action, {})
                 self.execute_action(
                     driver,
-                    action
+                    action,
+                    dataset_values=action_dataset
                 )
 
             duration = round(
@@ -354,6 +382,7 @@ class SeleniumExecutor:
 
             return {
                 "path_id": path_id,
+                "dataset_id": dataset_id,
                 "status": "PASS",
                 "actions": actions,
                 "failed_action": None,
@@ -393,6 +422,7 @@ class SeleniumExecutor:
 
             return {
                 "path_id": path_id,
+                "dataset_id": dataset_id,
                 "status": "FAIL",
                 "actions": actions,
                 "failed_action": action,
@@ -496,8 +526,9 @@ class SeleniumExecutor:
 
         start_time = time.perf_counter()
         paths = self.load_paths_from_csv()
+        dataset_ids = self.build_dataset_ids()
 
-        total = len(paths)
+        total = len(paths) * len(dataset_ids)
 
         results = []
 
@@ -507,19 +538,25 @@ class SeleniumExecutor:
 
             actions = p["actions"]
 
-            print(f"\nRUNNING PATH {path_id}")
+            for dataset_id in dataset_ids:
+                print(f"\nRUNNING PATH {path_id} | DATASET {dataset_id}")
 
-            result = self.run_path(
-                path_id,
-                actions
-            )
-            results.append(result)
+                result = self.run_path(
+                    path_id,
+                    actions,
+                    dataset_id=dataset_id,
+                    dataset_map=self.build_dataset_map_for_actions(
+                        actions,
+                        dataset_id
+                    )
+                )
+                results.append(result)
 
-            if result["status"] == "PASS":
-                print(f"PASS PATH {path_id}")
+                if result["status"] == "PASS":
+                    print(f"PASS PATH {path_id} | DATASET {dataset_id}")
 
-            else:
-                print(f"FAIL PATH {path_id}")
+                else:
+                    print(f"FAIL PATH {path_id} | DATASET {dataset_id}")
 
         passed = len([
             result for result in results
@@ -551,4 +588,68 @@ class SeleniumExecutor:
         print(f"Summary report: {self.report_path}")
 
         return summary
+
+    def build_dataset_ids(self):
+
+        max_rows = 0
+
+        for values in self.test_data.values():
+            if isinstance(values, list):
+                max_rows = max(max_rows, len(values))
+
+        if max_rows <= 0:
+            return ["row_1"]
+
+        return [f"row_{index}" for index in range(1, max_rows + 1)]
+
+    def build_dataset_map_for_actions(
+        self,
+        actions,
+        dataset_id
+    ):
+
+        row_index = self.extract_row_index(dataset_id)
+        output = {}
+
+        for action in actions:
+            action_data = self.test_data.get(action, [])
+
+            if (
+                isinstance(action_data, list)
+                and 0 <= row_index < len(action_data)
+                and isinstance(action_data[row_index], dict)
+            ):
+                output[action] = action_data[row_index]
+            else:
+                output[action] = {}
+
+        return output
+
+    def extract_row_index(self, dataset_id):
+
+        dataset_id = str(dataset_id)
+
+        if dataset_id.startswith("row_"):
+            raw_index = dataset_id.replace("row_", "", 1)
+
+            if raw_index.isdigit():
+                return int(raw_index) - 1
+
+        return 0
+
+    def resolve_dynamic_value(
+        self,
+        template_value,
+        dataset_values
+    ):
+
+        if not dataset_values:
+            return template_value
+
+        resolved = str(template_value)
+
+        for key, value in dataset_values.items():
+            resolved = resolved.replace(f"{{{{{key}}}}}", str(value))
+
+        return resolved
 

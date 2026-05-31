@@ -1,12 +1,12 @@
 {
-  "total": 1,
-  "passed": 1,
+  "total": 2,
+  "passed": 2,
   "failed": 0,
-  "total_duration": 11.151,
-  "average_duration": 11.151,
+  "total_duration": 12.299,
+  "average_duration": 6.149,
   "slowest_path": {
     "path_id": "1",
-    "duration": 9.004
+    "duration": 4.163
   },
   "most_failed_action": null,
   "most_failed_path": null,
@@ -17,6 +17,7 @@
   "results": [
     {
       "path_id": "1",
+      "dataset_id": "row_1",
       "status": "PASS",
       "actions": [
         "login_success",
@@ -36,7 +37,33 @@
         "q6"
       ],
       "failed_state": null,
-      "duration_seconds": 9.004,
+      "duration_seconds": 3.889,
+      "screenshot": null,
+      "error": null
+    },
+    {
+      "path_id": "1",
+      "dataset_id": "row_2",
+      "status": "PASS",
+      "actions": [
+        "login_success",
+        "go_to_cart",
+        "checkout_start",
+        "input_checkout_info",
+        "click_finish"
+      ],
+      "failed_action": null,
+      "failed_action_index": null,
+      "state_trace": [
+        "q0",
+        "q1",
+        "q3",
+        "q4",
+        "q5",
+        "q6"
+      ],
+      "failed_state": null,
+      "duration_seconds": 4.163,
       "screenshot": null,
       "error": null
     }
