@@ -1092,6 +1092,9 @@ else:
     with tab_files:
         st.subheader("Generated Files")
 
+        st.write("Supabase Test Run")
+        st.code(result.get("test_run_id", ""))
+        
         files = [
             {
                 "type": "Generated DFA model",
@@ -1106,6 +1109,14 @@ else:
                 "path": result["graph_path"]
             },
             {
+            "type": "CSV paths Supabase Storage",
+            "path": result.get("csv_storage_path", "")
+            },
+            {
+            "type": "Graph image Supabase Storage",
+            "path": result.get("graph_storage_path", "")
+            },
+            {
                 "type": "Summary report",
                 "path": str(REPORTS_DIR / "execution_summary.json")
             },
@@ -1114,6 +1125,15 @@ else:
                 "path": str(REPORTS_DIR / "screenshots")
             }
         ]
+
+        for item in summary.get("results", []):
+                screenshot_storage_path = item.get("screenshot_storage_path")
+
+                if screenshot_storage_path:
+                    files.append({
+                        "type": f"Screenshot Supabase path {item.get('path_id')}",
+                        "path": screenshot_storage_path
+                    })
 
         st.dataframe(
             pd.DataFrame(files),

@@ -9,6 +9,13 @@ from executor.selenium_executor import (
     SeleniumExecutor
 )
 
+from pathlib import Path
+from storage.supabase_storage import (
+    create_test_run,
+    update_test_run,
+    upload_file,
+    save_file_record
+)
 
 def run_framework(
     base_url,
@@ -54,12 +61,46 @@ def run_framework(
     )
 
     summary = executor.run_all_from_csv()
+    
+    test_run_id = create_test_run(
+    model_name=model_data["model_name"],
+    base_url=base_url,
+    summary=summary
+)
+
+    csv_storage_path = f"test-runs/{test_run_id}/csv/{Path(csv_path).name}"
+    upload_file(csv_path, csv_storage_path, "text/csv")
+    save_file_record(test_run_id, "csv", csv_storage_path)
+
+    graph_storage_path = f"test-runs/{test_run_id}/graphs/{Path(graph_path).name}"
+    upload_file(graph_path, graph_storage_path, "image/png")
+    save_file_record(test_run_id, "graph", graph_storage_path)
+
+    for result in summary.get("results", []):
+        screenshot = result.get("screenshot")
+
+        if screenshot and Path(screenshot).exists():
+            screenshot_storage_path = (
+                f"test-runs/{test_run_id}/screenshots/{Path(screenshot).name}"
+            )
+            upload_file(screenshot, screenshot_storage_path, "image/png")
+            save_file_record(test_run_id, "screenshot", screenshot_storage_path)
+            result["screenshot_storage_path"] = screenshot_storage_path
+
+    update_test_run(test_run_id, {
+        "csv_path": csv_storage_path,
+        "graph_path": graph_storage_path,
+        "summary": summary
+    })
 
     return {
+        "test_run_id": test_run_id,
         "model_name": model_data["model_name"],
         "base_url": base_url,
         "csv_path": csv_path,
         "graph_path": graph_path,
+        "csv_storage_path": csv_storage_path,
+        "graph_storage_path": graph_storage_path,
         "summary": summary
     }
 
