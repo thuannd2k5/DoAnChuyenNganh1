@@ -20,6 +20,12 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+# ─── Path constants ────────────────────────────────────────────────────────────
+REPORTS_DIR    = ROOT_DIR / "reports"
+TEMP_MODEL_PATH   = REPORTS_DIR / "temp_model.json"
+TEMP_MAPPING_PATH = REPORTS_DIR / "temp_mapping.json"
+# ───────────────────────────────────────────────────────────────────────────────
+
 integration_controller = importlib.import_module(
     "controller.integration_controller"
 )
@@ -27,11 +33,6 @@ integration_controller = importlib.reload(
     integration_controller
 )
 run_framework = integration_controller.run_framework
-
-
-REPORTS_DIR = ROOT_DIR / "reports"
-TEMP_MODEL_PATH = REPORTS_DIR / "temp_model.json"
-TEMP_MAPPING_PATH = REPORTS_DIR / "temp_mapping.json"
 
 STEP_TYPES = [
     "click",
@@ -63,31 +64,38 @@ STEP_TYPES_WITH_EXPECTED = {
 }
 
 
-def save_uploaded_json(uploaded_file, output_path):
+# ─── Helper functions ──────────────────────────────────────────────────────────
 
+def save_json(data, path):
+    """Lưu dict/list thành file JSON (tự tạo thư mục nếu chưa có)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def save_uploaded_json(uploaded_file, path):
+    """Đọc file JSON được upload, lưu ra disk và trả về dict."""
     data = json.load(uploaded_file)
-    save_json(data, output_path)
-
+    save_json(data, path)
     return data
 
 
-def save_json(data, output_path):
+def read_csv_if_exists(path):
+    """Đọc CSV nếu file tồn tại; trả về DataFrame hoặc None."""
+    path = Path(path)
+    if path.exists():
+        return pd.read_csv(path)
+    return None
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False),
-        encoding="utf-8"
-    )
 
+def image_exists(path):
+    """Kiểm tra file ảnh có tồn tại không."""
+    if not path:
+        return False
+    return Path(path).exists()
 
-def read_csv_if_exists(csv_path):
-
-    path = Path(csv_path)
-
-    if not path.exists():
-        return None
-
-    return pd.read_csv(path)
+# ───────────────────────────────────────────────────────────────────────────────
 
 
 def build_results_dataframe(results):
@@ -107,7 +115,7 @@ def build_results_dataframe(results):
             "failed_action": item.get("failed_action"),
             "failed_state": item.get("failed_state"),
             "error": item.get("error"),
-            "screenshot": item.get("screenshot")
+            "screenshot": item.get("screenshot_storage_path")
         })
 
     return pd.DataFrame(rows)
@@ -227,11 +235,6 @@ def build_chart_dataframe(rows, label_key, value_key):
         return pd.DataFrame()
 
     return pd.DataFrame(rows).set_index(label_key)[value_key]
-
-
-def image_exists(image_path):
-
-    return bool(image_path) and Path(image_path).exists()
 
 
 def init_builder_state():
@@ -361,8 +364,8 @@ def import_model_to_builder(model_data):
     )
     st.session_state.builder_max_depth = model_data.get("max_depth", 10)
 
-    # Optional: force refresh UI sau khi import
-    st.experimental_rerun()
+    st.rerun()
+
 
 def build_dfa_model():
 
@@ -744,14 +747,6 @@ def render_visual_mapping_builder(actions):
         else:
             st.success("Mapping is valid.")
 
-        if st.button(
-            "Save Generated Mapping",
-            use_container_width=True,
-            disabled=bool(errors)
-        ):
-            save_json(mapping, TEMP_MAPPING_PATH)
-            st.success(f"Saved mapping to {TEMP_MAPPING_PATH}")
-
     return mapping, errors
 
 
@@ -834,6 +829,8 @@ def validate_builder_model(model_data):
 
     return None
 
+
+# ─── Streamlit App ─────────────────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="DFA Web Testing Tool",
@@ -1129,7 +1126,7 @@ if run_button:
         st.error("Upload a Mapping JSON or enable Visual Mapping Builder.")
 
     else:
-        REPORTS_DIR.mkdir(exist_ok=True)
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
         try:
             save_json(

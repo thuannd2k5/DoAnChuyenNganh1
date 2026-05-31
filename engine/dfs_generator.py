@@ -1,20 +1,19 @@
 import csv
-import os
+import io
 
-from engine.graph_builder import build_graph
-from engine.validator import validate_dfa
+from engine.graph_builder import build_graph, build_graph_from_data
+from engine.validator import validate_dfa, validate_dfa_data
 
 
 def _safe_name(value):
-
     return value.lower().replace(" ", "_")
 
 
-def generate_paths(model_path, output_dir="reports", validate=True):
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    if validate:
+def generate_paths_data(model_path, validate=True):
+    if isinstance(model_path, dict):
+        data = validate_dfa_data(model_path) if validate else model_path
+        graph, data = build_graph_from_data(data)
+    elif validate:
         data = validate_dfa(model_path)
         graph, _ = build_graph(model_path)
     else:
@@ -26,7 +25,6 @@ def generate_paths(model_path, output_dir="reports", validate=True):
     all_paths = []
 
     def dfs(current_state, path, visited):
-
         if len(path) >= max_depth:
             return
 
@@ -37,7 +35,6 @@ def generate_paths(model_path, output_dir="reports", validate=True):
         visited.add(current_state)
 
         for next_state in graph.successors(current_state):
-
             if next_state not in visited or next_state in final_states:
                 action = graph[current_state][next_state]["action"]
                 path.append(action)
@@ -46,18 +43,21 @@ def generate_paths(model_path, output_dir="reports", validate=True):
 
     dfs(start_state, [], set())
 
-    model_name = _safe_name(data["model_name"])
-    csv_path = os.path.join(output_dir, f"{model_name}_paths.csv")
+    return data, all_paths
 
-    with open(csv_path, "w", newline="", encoding="utf-8") as file:
 
-        writer = csv.writer(file)
-        writer.writerow(["path_id", "actions"])
+def generate_paths_csv_bytes(model_path, validate=True):
+    data, all_paths = generate_paths_data(model_path, validate=validate)
 
-        for index, path in enumerate(all_paths, start=1):
-            writer.writerow([index, ",".join(path)])
+    output = io.StringIO()
+    writer = csv.writer(output)
 
-    print(f"Generated {len(all_paths)} test paths")
-    print(f"CSV exported to: {csv_path}")
+    writer.writerow(["path_id", "actions"])
 
-    return csv_path
+    for index, path in enumerate(all_paths, start=1):
+        writer.writerow([index, ",".join(path)])
+
+    csv_bytes = output.getvalue().encode("utf-8")
+    filename = f"{_safe_name(data['model_name'])}_paths.csv"
+
+    return csv_bytes, filename, all_paths
