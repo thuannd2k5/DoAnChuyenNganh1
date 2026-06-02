@@ -99,6 +99,11 @@ def validate_dfa(model_path):
 
     data = load_model(model_path)
 
+    return validate_dfa_data(data)
+
+
+def validate_dfa_data(data):
+
     validate_json_schema(data)
     validate_dfa_rules(data)
 

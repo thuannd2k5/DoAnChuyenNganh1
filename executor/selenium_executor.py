@@ -1,5 +1,4 @@
 ﻿import os
-import csv
 import json
 import time
 from collections import Counter
@@ -28,7 +27,6 @@ class SeleniumExecutor:
         self,
         mapping,
         base_url,
-        csv_path,
         reports_dir="reports",
         model_data=None,
         test_data=None
@@ -36,25 +34,9 @@ class SeleniumExecutor:
 
         self.mapping = mapping
         self.base_url = base_url
-        self.csv_path = csv_path
         self.reports_dir = reports_dir
         self.model_data = model_data or {}
         self.test_data = test_data or {}
-
-        self.screenshot_folder = os.path.join(
-            reports_dir,
-            "screenshots"
-        )
-        self.report_path = os.path.join(
-            reports_dir,
-            "execution_summary.json"
-        )
-
-        os.makedirs(
-            self.screenshot_folder,
-            exist_ok=True
-        )
-        os.makedirs(reports_dir, exist_ok=True)
 
     def build_transition_map(self):
 
@@ -119,38 +101,6 @@ class SeleniumExecutor:
 
         return driver
     
-    def load_paths_from_csv(self):
-
-        paths = []
-
-        with open(
-            self.csv_path,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            reader = csv.DictReader(f)
-
-            for row in reader:
-
-                actions = (
-                    row["actions"]
-                    .replace('"', '')
-                    .split(",")
-                )
-                actions = [
-                    action.strip()
-                    for action in actions
-                    if action.strip()
-                ]
-
-                paths.append({
-                    "path_id": row["path_id"],
-                    "actions": actions
-                })
-
-        return paths
-
     def take_screenshot(
         self,
         driver,
@@ -166,14 +116,10 @@ class SeleniumExecutor:
             f"path_{path_id}_{action}_{timestamp}.png"
         )
 
-        filepath = os.path.join(
-            self.screenshot_folder,
-            filename
-        )
-
-        driver.save_screenshot(filepath)
-
-        return filepath
+        return {
+            "filename": filename,
+            "bytes": driver.get_screenshot_as_png()
+        }
 
     def get_by(self, selector_type):
 
@@ -351,7 +297,9 @@ class SeleniumExecutor:
                 return
 
             if action_type == "screenshot":
-                self.take_screenshot(driver, "manual", action_name)
+                screenshot = self.take_screenshot(driver, "manual", action_name)
+                current_log["screenshot_bytes"] = screenshot["bytes"]
+                current_log["screenshot_filename"] = screenshot["filename"]
                 return
 
             raise ValueError(f"Unsupported action type: {action_type}")
@@ -419,16 +367,20 @@ class SeleniumExecutor:
         except Exception as e:
             duration = round(time.perf_counter() - start_time, 3)
             screenshot = None
+            screenshot_bytes = None
+            screenshot_filename = None
 
             if driver:
                 screenshot = self.take_screenshot(driver, path_id, action)
+                screenshot_bytes = screenshot["bytes"]
+                screenshot_filename = screenshot["filename"]
 
             failed_state = None
             if failed_action_index is not None and failed_action_index < len(state_trace):
                 failed_state = state_trace[failed_action_index]
 
             print(f"[FAIL] {e}")
-            print(f"Screenshot: {screenshot}")
+            print(f"Screenshot: {screenshot_filename}")
             print(f"DATA USED: {dataset_map}")
             self.print_action_logs(path_id, dataset_id, action_logs)
 
@@ -442,7 +394,9 @@ class SeleniumExecutor:
                 "state_trace": state_trace,
                 "failed_state": failed_state,
                 "duration_seconds": duration,
-                "screenshot": screenshot,
+                "screenshot": None,
+                "screenshot_bytes": screenshot_bytes,
+                "screenshot_filename": screenshot_filename,
                 "error": str(e),
                 "dataset_map_used": dataset_map or {},
                 "action_logs": action_logs
@@ -621,10 +575,9 @@ class SeleniumExecutor:
             ]
         }
 
-    def run_all_from_csv(self):
+    def run_all_from_paths(self, paths):
 
         start_time = time.perf_counter()
-        paths = self.load_paths_from_csv()
         dataset_ids = self.build_dataset_ids()
 
         total = len(paths) * len(dataset_ids)
@@ -688,11 +641,6 @@ class SeleniumExecutor:
         print(f"PASS  : {passed}")
         print(f"FAIL  : {failed}")
         print(f"TIME  : {summary['total_duration']}s")
-
-        with open(self.report_path, "w", encoding="utf-8") as file:
-            json.dump(summary, file, indent=2, ensure_ascii=False)
-
-        print(f"Summary report: {self.report_path}")
 
         return summary
 
