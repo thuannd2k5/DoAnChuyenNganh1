@@ -22,7 +22,8 @@ def run_framework(
     reports_dir="reports",
     test_data=None,
     model_data=None,
-    mapping_data=None
+    mapping_data=None,
+    user_id=None
 ):
 
     # 1. Validate DFA
@@ -72,7 +73,8 @@ def run_framework(
     test_run_id = create_test_run(
         model_name=model_data["model_name"],
         base_url=base_url,
-        summary={}
+        summary={},
+        user_id=user_id
     )
 
     csv_storage_path = f"test-runs/{test_run_id}/csv/{csv_filename}"
