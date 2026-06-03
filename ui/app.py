@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+
 try:
     from streamlit_agraph import Config, Edge, Node, agraph
 except ImportError:
@@ -19,6 +20,8 @@ except ImportError:
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+from storage.supabase_storage import sign_in, sign_up, sign_out, get_test_runs_by_user, get_test_run_files
 
 # ─── Path constants ────────────────────────────────────────────────────────────
 REPORTS_DIR    = ROOT_DIR / "reports"
@@ -34,6 +37,126 @@ integration_controller = importlib.reload(
 )
 run_framework = integration_controller.run_framework
 
+def render_auth():
+    st.title("DFA Web Testing Tool")
+
+    login_tab, register_tab = st.tabs(["Login", "Register"])
+
+    with login_tab:
+        email = st.text_input(
+            "Email",
+            key="login_email"
+        )
+        password = st.text_input(
+            "Password",
+            type="password",
+            key="login_password"
+        )
+
+        if st.button("Login", use_container_width=True):
+            try:
+                response = sign_in(email, password)
+
+                st.session_state.auth_user = response.user
+                st.session_state.auth_session = response.session
+
+                st.success("Logged in successfully.")
+                st.rerun()
+
+            except Exception as error:
+                st.error(str(error))
+
+    with register_tab:
+        email = st.text_input(
+            "Email",
+            key="register_email"
+        )
+        password = st.text_input(
+            "Password",
+            type="password",
+            key="register_password"
+        )
+
+        if st.button("Register", use_container_width=True):
+            try:
+                response = sign_up(email, password)
+
+                if response.session:
+                    st.session_state.auth_user = response.user
+                    st.session_state.auth_session = response.session
+
+                    st.success("Registered and logged in.")
+                    st.rerun()
+                else:
+                    st.success(
+                        "Registered. Please check your email to confirm your account."
+                    )
+
+            except Exception as error:
+                st.error(str(error))
+
+def render_test_history():
+    st.subheader("Test History")
+
+    user = st.session_state.auth_user
+    runs = get_test_runs_by_user(user.id)
+
+    if not runs:
+        st.info("No test history yet.")
+        return
+
+    rows = []
+
+    for run in runs:
+        summary = run.get("summary") or {}
+
+        rows.append({
+            "id": run.get("id"),
+            "model_name": run.get("model_name"),
+            "base_url": run.get("base_url"),
+            "total": summary.get("total", 0),
+            "passed": summary.get("passed", 0),
+            "failed": summary.get("failed", 0),
+            "created_at": run.get("created_at")
+        })
+
+    history_df = pd.DataFrame(rows)
+
+    st.dataframe(
+        history_df,
+        use_container_width=True
+    )
+
+    selected_run_id = st.selectbox(
+        "Select test run",
+        options=[row["id"] for row in rows],
+        format_func=lambda run_id: next(
+            (
+                f"{row['model_name']} | {row['created_at']} | failed={row['failed']}"
+                for row in rows
+                if row["id"] == run_id
+            ),
+            run_id
+        )
+    )
+
+    selected_run = next(
+        run for run in runs
+        if run["id"] == selected_run_id
+    )
+
+    st.write("Summary")
+    st.json(selected_run.get("summary") or {})
+
+    files = get_test_run_files(selected_run_id)
+
+    st.write("Files")
+    st.dataframe(
+        pd.DataFrame(files),
+        use_container_width=True
+    )
+    
+    
 STEP_TYPES = [
     "click",
     "input",
@@ -837,6 +960,16 @@ st.set_page_config(
     layout="wide"
 )
 
+if "auth_user" not in st.session_state:
+    st.session_state.auth_user = None
+
+if "auth_session" not in st.session_state:
+    st.session_state.auth_session = None
+
+if not st.session_state.auth_user:
+    render_auth()
+    st.stop()
+
 init_builder_state()
 init_mapping_builder_state()
 
@@ -844,6 +977,26 @@ st.title("DFA Web Testing Tool")
 st.caption("Model-Based Testing with DFA, DFS and Selenium")
 
 st.sidebar.header("Test Configuration")
+
+view_mode = st.sidebar.radio(
+    "View",
+    ["Run Test", "History"]
+)
+
+if view_mode == "History":
+    render_test_history()
+    st.stop()
+
+auth_user = st.session_state.auth_user
+
+if auth_user:
+    st.sidebar.write(f"Logged in: {auth_user.email}")
+
+if st.sidebar.button("Logout", use_container_width=True):
+    sign_out()
+    st.session_state.auth_user = None
+    st.session_state.auth_session = None
+    st.rerun()
 
 website_url = st.sidebar.text_input(
     "Website URL",
@@ -1150,7 +1303,8 @@ if run_button:
                     model_path=str(TEMP_MODEL_PATH),
                     mapping_path=str(TEMP_MAPPING_PATH),
                     reports_dir=str(REPORTS_DIR),
-                    test_data=st.session_state.test_data
+                    test_data=st.session_state.test_data,
+                    user_id=st.session_state.auth_user.id
                 )
 
             st.session_state.result = {
