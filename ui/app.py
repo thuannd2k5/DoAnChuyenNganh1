@@ -2,6 +2,7 @@ import json
 import importlib
 import re
 import sys
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
@@ -21,7 +22,15 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from storage.supabase_storage import sign_in, sign_up, sign_out, get_test_runs_by_user, get_test_run_files
+from storage.supabase_storage import (
+    create_signed_file_url,
+    download_file_bytes,
+    sign_in,
+    sign_up,
+    sign_out,
+    get_test_runs_by_user,
+    get_test_run_files
+)
 
 # ─── Path constants ────────────────────────────────────────────────────────────
 REPORTS_DIR    = ROOT_DIR / "reports"
@@ -204,7 +213,7 @@ def save_uploaded_json(uploaded_file, path):
     return data
 
 
-def read_csv_if_exists(path):
+def read_local_csv_if_exists(path):
     """Đọc CSV nếu file tồn tại; trả về DataFrame hoặc None."""
     path = Path(path)
     if path.exists():
@@ -217,6 +226,67 @@ def image_exists(path):
     if not path:
         return False
     return Path(path).exists()
+
+
+def read_csv_if_exists(path):
+    if not path:
+        return None
+
+    path_value = str(path)
+    local_path = Path(path_value)
+
+    if local_path.exists():
+        return pd.read_csv(local_path)
+
+    try:
+        csv_bytes = download_file_bytes(path_value)
+        return pd.read_csv(BytesIO(csv_bytes))
+    except Exception:
+        return None
+
+
+def get_image_source_if_exists(path):
+    if not path:
+        return None
+
+    path_value = str(path)
+    local_path = Path(path_value)
+
+    if local_path.exists():
+        return path_value
+
+    if path_value.startswith(("http://", "https://")):
+        return path_value
+
+    try:
+        return create_signed_file_url(path_value)
+    except Exception:
+        return None
+
+
+def image_exists(path):
+    return get_image_source_if_exists(path) is not None
+
+
+def get_failed_result_screenshot_path(result_item):
+    screenshot_path = (
+        result_item.get("screenshot_storage_path")
+        or result_item.get("screenshot")
+    )
+
+    if screenshot_path:
+        return screenshot_path
+
+    for action_log in result_item.get("action_logs", []):
+        screenshot_path = (
+            action_log.get("screenshot_storage_path")
+            or action_log.get("screenshot")
+        )
+
+        if screenshot_path:
+            return screenshot_path
+
+    return None
 
 # ───────────────────────────────────────────────────────────────────────────────
 
@@ -1003,11 +1073,6 @@ website_url = st.sidebar.text_input(
     value="https://www.saucedemo.com/"
 )
 
-mapping_file = st.sidebar.file_uploader(
-    "Mapping JSON fallback",
-    type=["json"]
-)
-
 use_visual_mapping = st.sidebar.checkbox(
     "Use Visual Mapping Builder",
     value=True
@@ -1437,11 +1502,12 @@ else:
                 st.write("State Trace:")
                 st.code(" -> ".join(item.get("state_trace", [])))
 
-                screenshot_path = item.get("screenshot")
+                screenshot_path = get_failed_result_screenshot_path(item)
+                screenshot_source = get_image_source_if_exists(screenshot_path)
 
-                if image_exists(screenshot_path):
+                if screenshot_source:
                     st.image(
-                        screenshot_path,
+                        screenshot_source,
                         caption=screenshot_path,
                         use_container_width=True
                     )
@@ -1540,10 +1606,11 @@ else:
     with tab_graph:
         st.subheader("DFA Graph")
 
-        graph_path = Path(result["graph_path"])
+        graph_path = result["graph_path"]
+        graph_source = get_image_source_if_exists(graph_path)
 
-        if graph_path.exists():
-            st.image(str(graph_path))
+        if graph_source:
+            st.image(graph_source)
         else:
             st.warning("Graph image was not found.")
 

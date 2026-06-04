@@ -56,6 +56,19 @@ def upload_bytes(data, storage_path, content_type="application/octet-stream"):
     return response
 
 
+def download_file_bytes(storage_path):
+    return supabase.storage.from_(SUPABASE_BUCKET).download(storage_path)
+
+
+def create_signed_file_url(storage_path, expires_in=3600):
+    response = supabase.storage.from_(SUPABASE_BUCKET).create_signed_url(
+        storage_path,
+        expires_in
+    )
+
+    return response.get("signedURL") or response.get("signedUrl")
+
+
 def create_test_run(model_name, base_url, summary=None, user_id=None):
     response = (
         supabase.table("test_runs")
