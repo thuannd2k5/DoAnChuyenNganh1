@@ -129,6 +129,8 @@ def render_test_history():
             "created_at": run.get("created_at")
         })
 
+    st.write("Test run history")
+
     history_df = pd.DataFrame(rows)
 
     st.dataframe(
@@ -137,7 +139,7 @@ def render_test_history():
     )
 
     selected_run_id = st.selectbox(
-        "Select test run",
+        "Select a test run to view details",
         options=[row["id"] for row in rows],
         format_func=lambda run_id: next(
             (
@@ -154,15 +156,11 @@ def render_test_history():
         if run["id"] == selected_run_id
     )
 
-    st.write("Summary")
-    st.json(selected_run.get("summary") or {})
-
     files = get_test_run_files(selected_run_id)
 
-    st.write("Files")
-    st.dataframe(
-        pd.DataFrame(files),
-        use_container_width=True
+    render_history_run_details(
+        selected_run,
+        files
     )
     
     
@@ -268,7 +266,7 @@ def image_exists(path):
     return get_image_source_if_exists(path) is not None
 
 
-def get_failed_result_screenshot_path(result_item):
+def get_failed_result_screenshot_path(result_item, screenshot_files=None):
     screenshot_path = (
         result_item.get("screenshot_storage_path")
         or result_item.get("screenshot")
@@ -286,7 +284,313 @@ def get_failed_result_screenshot_path(result_item):
         if screenshot_path:
             return screenshot_path
 
+    path_id = str(result_item.get("path_id") or "")
+    failed_action = str(result_item.get("failed_action") or "")
+    screenshot_files = screenshot_files or []
+
+    for item in screenshot_files:
+        storage_path = str(item.get("storage_path") or "")
+
+        if (
+            path_id
+            and f"path_{path_id}_" in storage_path
+            and (not failed_action or failed_action in storage_path)
+        ):
+            return storage_path
+
+    for item in screenshot_files:
+        storage_path = str(item.get("storage_path") or "")
+
+        if path_id and f"path_{path_id}_" in storage_path:
+            return storage_path
+
     return None
+
+
+def get_file_storage_path(files, file_type):
+    for item in files:
+        if str(item.get("file_type", "")).lower() == file_type:
+            return item.get("storage_path")
+
+    return None
+
+
+def render_result_metrics(summary):
+    total = summary.get("total", 0)
+    passed = summary.get("passed", 0)
+    failed = summary.get("failed", 0)
+    total_duration = summary.get("total_duration", 0)
+    average_duration = summary.get("average_duration", 0)
+    slowest_path = summary.get("slowest_path") or {}
+
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1.metric("Total Paths", total)
+    col2.metric("Passed", passed)
+    col3.metric("Failed", failed)
+    col4.metric("Total Time", f"{total_duration}s")
+    col5.metric("Avg Time", f"{average_duration}s")
+    col6.metric(
+        "Slowest Path",
+        slowest_path.get("path_id", "-")
+    )
+
+
+def render_history_run_details(selected_run, files):
+    summary = selected_run.get("summary") or {}
+    csv_path = selected_run.get("csv_path") or get_file_storage_path(files, "csv")
+    graph_path = selected_run.get("graph_path") or get_file_storage_path(files, "graph")
+    screenshot_files = [
+        item for item in files
+        if str(item.get("file_type", "")).lower() == "screenshot"
+    ]
+
+    st.divider()
+    st.write("Selected test run")
+    info_cols = st.columns(3)
+    info_cols[0].write(f"Model: {selected_run.get('model_name') or '-'}")
+    info_cols[1].write(f"Base URL: {selected_run.get('base_url') or '-'}")
+    info_cols[2].write(f"Created: {selected_run.get('created_at') or '-'}")
+
+    render_result_metrics(summary)
+
+    (
+        tab_summary,
+        tab_failures,
+        tab_analytics,
+        tab_paths,
+        tab_graph,
+        tab_screenshots,
+        tab_files
+    ) = st.tabs(
+        [
+            "Summary",
+            "Failures",
+            "Analytics",
+            "Generated Paths",
+            "Graph",
+            "Screenshots",
+            "Files"
+        ]
+    )
+
+    with tab_summary:
+        st.subheader("Execution Summary")
+
+        st.download_button(
+            "Download Summary JSON",
+            data=json.dumps(summary, indent=2, ensure_ascii=False),
+            file_name=f"execution_summary_{selected_run.get('id')}.json",
+            mime="application/json",
+            use_container_width=True
+        )
+
+        results_df = build_results_dataframe(
+            summary.get("results", [])
+        )
+
+        st.dataframe(
+            results_df,
+            use_container_width=True
+        )
+
+        timing_df = results_df[
+            [
+                "path_id",
+                "duration_seconds",
+                "status"
+            ]
+        ] if not results_df.empty else pd.DataFrame()
+
+        if not timing_df.empty:
+            st.subheader("Execution Timing")
+            st.bar_chart(
+                timing_df.set_index("path_id")["duration_seconds"]
+            )
+
+        st.json(summary)
+
+    with tab_failures:
+        st.subheader("Failed Test Cases")
+
+        failed_results = [
+            item for item in summary.get("results", [])
+            if item.get("status") == "FAIL"
+        ]
+
+        if not failed_results:
+            st.success("No failed test cases.")
+
+        for item in failed_results:
+            title = (
+                f"Path {item.get('path_id')} | "
+                f"Dataset {item.get('dataset_id', 'row_1')} | "
+                f"Action: {item.get('failed_action')} | "
+                f"{item.get('duration_seconds')}s"
+            )
+
+            with st.expander(title, expanded=True):
+                st.write("Error:")
+                st.code(item.get("error") or "")
+
+                st.write("Dataset Values:")
+                st.json(item.get("dataset_map_used", {}))
+
+                st.write("Action Logs:")
+                st.json(item.get("action_logs", []))
+
+                st.write("Actions:")
+                st.code(" -> ".join(item.get("actions", [])))
+
+                st.write("State Trace:")
+                st.code(" -> ".join(item.get("state_trace", [])))
+
+                screenshot_path = get_failed_result_screenshot_path(
+                    item,
+                    screenshot_files
+                )
+                screenshot_source = get_image_source_if_exists(screenshot_path)
+
+                if screenshot_source:
+                    st.image(
+                        screenshot_source,
+                        caption=screenshot_path,
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("No screenshot available.")
+
+    with tab_analytics:
+        st.subheader("Fail Analytics")
+
+        most_failed_action = summary.get("most_failed_action") or {}
+
+        a1, a2, a3 = st.columns(3)
+        a1.metric(
+            "Most Failed Action",
+            most_failed_action.get("action", "-"),
+            most_failed_action.get("count", 0)
+        )
+        a2.metric(
+            "Most Failed Path",
+            (summary.get("most_failed_path") or {}).get("path_id", "-"),
+            (summary.get("most_failed_path") or {}).get("count", 0)
+        )
+        a3.metric(
+            "Most Failed State",
+            (summary.get("most_failed_state") or {}).get("state", "-"),
+            (summary.get("most_failed_state") or {}).get("count", 0)
+        )
+
+        failed_actions = summary.get("failed_actions", [])
+        failed_paths = summary.get("failed_paths", [])
+        failed_states = summary.get("failed_states", [])
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.write("Failed Actions")
+            action_chart = build_chart_dataframe(
+                failed_actions,
+                "action",
+                "fail_count"
+            )
+
+            if action_chart.empty:
+                st.info("No failed actions.")
+            else:
+                st.bar_chart(action_chart)
+                st.dataframe(
+                    pd.DataFrame(failed_actions),
+                    use_container_width=True
+                )
+
+        with c2:
+            st.write("Failed Paths")
+            path_chart = build_chart_dataframe(
+                failed_paths,
+                "path_id",
+                "fail_count"
+            )
+
+            if path_chart.empty:
+                st.info("No failed paths.")
+            else:
+                st.bar_chart(path_chart)
+                st.dataframe(
+                    pd.DataFrame(failed_paths),
+                    use_container_width=True
+                )
+
+        st.write("Failed State Frequency")
+        state_chart = build_chart_dataframe(
+            failed_states,
+            "state",
+            "fail_frequency"
+        )
+
+        if state_chart.empty:
+            st.info("No failed states.")
+        else:
+            st.bar_chart(state_chart)
+            st.dataframe(
+                pd.DataFrame(failed_states),
+                use_container_width=True
+            )
+
+    with tab_paths:
+        st.subheader("Generated Test Paths")
+
+        csv_data = read_csv_if_exists(csv_path)
+
+        if csv_data is None:
+            st.warning("CSV file was not found.")
+        else:
+            st.dataframe(
+                csv_data,
+                use_container_width=True
+            )
+
+    with tab_graph:
+        st.subheader("DFA Graph")
+
+        graph_source = get_image_source_if_exists(graph_path)
+
+        if graph_source:
+            st.image(graph_source)
+        else:
+            st.warning("Graph image was not found.")
+
+    with tab_screenshots:
+        st.subheader("Screenshots")
+
+        if not screenshot_files:
+            st.info("No screenshots were stored for this run.")
+
+        for item in screenshot_files:
+            storage_path = item.get("storage_path")
+            screenshot_source = get_image_source_if_exists(storage_path)
+
+            if screenshot_source:
+                st.image(
+                    screenshot_source,
+                    caption=storage_path,
+                    use_container_width=True
+                )
+            else:
+                st.warning(f"Screenshot was not found: {storage_path}")
+
+    with tab_files:
+        st.subheader("Generated Files")
+
+        file_rows = pd.DataFrame(files)
+
+        if file_rows.empty:
+            st.info("No file records were stored for this run.")
+        else:
+            st.dataframe(
+                file_rows,
+                use_container_width=True
+            )
 
 # ───────────────────────────────────────────────────────────────────────────────
 
@@ -894,51 +1198,59 @@ def render_visual_mapping_builder(actions):
         if action not in actions
     ]
 
-    for action in all_actions:
-        steps = st.session_state.mapping_builder_steps[action]
-        title = f"Action: {action} ({len(steps)} step{'s' if len(steps) != 1 else ''})"
+    steps_tab, preview_tab = st.tabs(
+        [
+            "Step Actions",
+            "Mapping JSON Preview"
+        ]
+    )
 
-        with st.expander(title, expanded=True):
-            if not steps:
-                st.info("No steps yet.")
+    with steps_tab:
+        for action in all_actions:
+            steps = st.session_state.mapping_builder_steps[action]
+            title = f"Action: {action} ({len(steps)} step{'s' if len(steps) != 1 else ''})"
 
-            for index, step in enumerate(steps):
-                st.markdown(f"Step {index + 1}")
-                render_step_form(action, step, index)
+            with st.expander(title, expanded=True):
+                if not steps:
+                    st.info("No steps yet.")
 
-            if st.button(
-                "Add Step",
-                key=f"mapping_{action}_add_step"
-            ):
-                add_mapping_step(action)
-                st.rerun()
+                for index, step in enumerate(steps):
+                    st.markdown(f"Step {index + 1}")
+                    render_step_form(action, step, index)
+
+                if st.button(
+                    "Add Step",
+                    key=f"mapping_{action}_add_step"
+                ):
+                    add_mapping_step(action)
+                    st.rerun()
 
     mapping = build_mapping_from_builder(all_actions)
     errors = validate_mapping_builder(mapping, all_actions)
 
-    preview_col, validation_col = st.columns([1.2, 1])
+    with preview_tab:
+        preview_col, validation_col = st.columns([1.2, 1])
 
-    with preview_col:
-        st.write("Mapping JSON preview")
-        st.json(mapping)
+        with preview_col:
+            st.json(mapping)
 
-        st.download_button(
-            "Download mapping.json",
-            data=json.dumps(mapping, indent=2, ensure_ascii=False),
-            file_name="mapping.json",
-            mime="application/json",
-            use_container_width=True,
-            disabled=bool(errors)
-        )
+            st.download_button(
+                "Download mapping.json",
+                data=json.dumps(mapping, indent=2, ensure_ascii=False),
+                file_name="mapping.json",
+                mime="application/json",
+                use_container_width=True,
+                disabled=bool(errors)
+            )
 
-    with validation_col:
-        st.write("Validation")
+        with validation_col:
+            st.write("Validation")
 
-        if errors:
-            for error in errors:
-                st.error(error)
-        else:
-            st.success("Mapping is valid.")
+            if errors:
+                for error in errors:
+                    st.error(error)
+            else:
+                st.success("Mapping is valid.")
 
     return mapping, errors
 
